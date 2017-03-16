@@ -1,0 +1,5 @@
+[bottle]
+host = localhost
+port = 8888
+server = wsgiref
+debug = false

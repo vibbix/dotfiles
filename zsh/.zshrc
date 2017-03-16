@@ -5,6 +5,12 @@ export TOILET_FONT_PATH="/usr/share/figlet"
 export gorp="fuck off"
 export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH
 export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
+# g cloud
+source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
+source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
+# virtualenv
+export WORKON_HOME=~/virtualenvs
+source /usr/local/bin/virtualenvwrapper.sh
 # Path to your oh-my-zsh installation.
 export ZSH=/Users/vibbix/.oh-my-zsh
 export NVM_DIR="$HOME/.nvm"
@@ -83,7 +89,7 @@ POWERLEVEL9K_DIR_DEFAULT_FOREGROUND="236"
 POWERLEVEL9K_SHORTEN_STRATEGY="truncate_middle"
 POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon context dir vcs)
 #POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(icons_test)
-POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song load battery time)
+POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load battery time)
 POWERLEVEL9K_MULTILINE_FIRST_PROMPT_PREFIX=""
 POWERLEVEL9K_MULTILINE_SECOND_PROMPT_PREFIX="%{%B%F{yellow}%K{blue}%} ❯%{%b%f%k%F{blue}%}\UE0C0 %{%f%}"
 POWERLEVEL9K_CHANGESET_HASH_LENGTH=5
