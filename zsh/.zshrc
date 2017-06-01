@@ -3,7 +3,7 @@ export GOPATH="$HOME/go"
 export TERM="screen-256color"
 export TOILET_FONT_PATH="/usr/share/figlet"
 export gorp="fuck off"
-export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH
+export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:$PATH
 export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
 # g cloud
 source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
@@ -238,4 +238,12 @@ echo -n 'URL=' >> $file
 echo $url >> $file
 #echo 'IconIndex=0' >> $file
 
+}
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+source $HOME/.cargo/env
+
+# Usage: compresspdf [input file] [output file] [screen*|ebook|printer|prepress]
+compresspdf() {
+    gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${3:-"screen"} -dCompatibilityLevel=1.4 -sOutputFile="$2" "$1"
 }

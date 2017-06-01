@@ -1,0 +1,17 @@
+#tmux
+c  create window
+w  list windows
+n  next window
+p  previous window
+f  find window
+,  name window
+&  kill window
+|  vertical split
+-  horizontal split
+#irssi
+
+#elinks
+esc
+< prev tab
+> next tab
+g url
