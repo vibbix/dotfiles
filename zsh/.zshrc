@@ -225,3 +225,4 @@ echo $url >> $file
 
 }
 #source $HOME/.cargo/env
+export PATH="/usr/local/sbin:$PATH"
