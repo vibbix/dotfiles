@@ -8,7 +8,7 @@ case "${unameOut}" in
     *)          machine="UNKNOWN:${unameOut}"
 esac
 export GOPATH="$HOME/go"
-export TERM="screen-256color"
+#export TERM="screen-256color"
 export TOILET_FONT_PATH="/usr/share/figlet"
 export gorp="fuck off"
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
@@ -30,12 +30,14 @@ then
   source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 else
-    export ZSH=/home/vibbix/.oh-my-zsh
-    #source ./zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-    plugins=(gitfast vscode tmux)
+  #ZSH_THEME="agnoster"
+  export ZSH=/home/vibbix/.oh-my-zsh
+  #source ./zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+  plugins=(gitfast vscode tmux)
 fi
 ZSH_THEME="powerlevel9k/powerlevel9k"
 POWERLEVEL9K_MODE='awesome-fontconfig'
+
 source $ZSH/oh-my-zsh.sh
 alias gorp="toilet -d $TOILET_FONT_PATH -f 3d  \"$gorp\" | lolcat -t -a"
 function toiletfonts(){
@@ -226,3 +228,4 @@ echo $url >> $file
 }
 #source $HOME/.cargo/env
 export PATH="/usr/local/sbin:$PATH"
+[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
