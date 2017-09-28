@@ -5,7 +5,7 @@
 # See this wiki page for more info:
 # https://github.com/dylanaraps/neofetch/wiki/Customizing-Info
 print_info() {
-    pause(100)
+    # pause(100)
     info title
     info underline
     #conftoilet=$(toilet -d $TOILET_FONT_PATH -f rustofat "Welcome $USER" --gay | lolcat)

@@ -1,70 +1,53 @@
-POWERLEVEL9K_MODE='awesome-fontconfig'
+#check OS
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    Linux*)     machine=Linux;;
+    Darwin*)    machine=Mac;;
+    CYGWIN*)    machine=Cygwin;;
+    MINGW*)     machine=MinGw;;
+    *)          machine="UNKNOWN:${unameOut}"
+esac
 export GOPATH="$HOME/go"
 export TERM="screen-256color"
 export TOILET_FONT_PATH="/usr/share/figlet"
 export gorp="fuck off"
-export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:$PATH
-export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
-# g cloud
-source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
-source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
-# virtualenv
-export WORKON_HOME=~/virtualenvs
-source /usr/local/bin/virtualenvwrapper.sh
-# Path to your oh-my-zsh installation.
-export ZSH=/Users/vibbix/.oh-my-zsh
-export NVM_DIR="$HOME/.nvm"
-# Set name of the theme to load. Optionally, if you set this to "random"
-# it'll load a random theme each time that oh-my-zsh is loaded.
-# See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+if [[ $machine == 'Mac' ]]
+then
+  export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:$PATH
+  export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
+  # g cloud
+  source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
+  source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
+  # virtualenv
+  export WORKON_HOME=~/virtualenvs
+  source /usr/local/bin/virtualenvwrapper.sh
+  # Path to your oh-my-zsh installation.
+  export ZSH=/Users/vibbix/.oh-my-zsh
+  export NVM_DIR="$HOME/.nvm"
+  plugins=(gitfast docker osx web-search vscode tmux)
+  source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+  test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+else
+    export ZSH=/home/vibbix/.oh-my-zsh
+    #source ./zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+    plugins=(gitfast vscode tmux)
+fi
 ZSH_THEME="powerlevel9k/powerlevel9k"
-
-# Which plugins would you like to load? (plugins can be found in ~/.oh-my-zsh/plugins/*)
-# Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
-# Example format: plugins=(rails git textmate ruby lighthouse)
-# Add wisely, as too many plugins slow down shell startup.
-plugins=(gitfast docker osx web-search vscode tmux)
-#ZSH_TMUX_AUTOSTART="true"
-#ZSH_TMUX_ITERM2="true"
+POWERLEVEL9K_MODE='awesome-fontconfig'
 source $ZSH/oh-my-zsh.sh
-
-# User configuration
-
-# export MANPATH="/usr/local/man:$MANPATH"
-
-# You may need to manually set your language environment
-# export LANG=en_US.UTF-8
-
-# Preferred editor for local and remote sessions
-# if [[ -n $SSH_CONNECTION ]]; then
-#   export EDITOR='vim'
-# else
-#   export EDITOR='mvim'
-# fi
-
-# Compilation flags
-# export ARCHFLAGS="-arch x86_64"
-
-# ssh
-# export SSH_KEY_PATH="~/.ssh/rsa_id"
-
-# Set personal aliases, overriding those provided by oh-my-zsh libs,
-# plugins, and themes. Aliases can be placed here, though oh-my-zsh
-# users are encouraged to define aliases within the ZSH_CUSTOM folder.
-# For a full list of active aliases, run `alias`.
-#
-# Example aliases
-# alias zshconfig="mate ~/.zshrc"
-# alias ohmyzsh="mate ~/.oh-my-zsh"
 alias gorp="toilet -d $TOILET_FONT_PATH -f 3d  \"$gorp\" | lolcat -t -a"
 function toiletfonts(){
     for i in ${TOILET_FONT_PATH:=/usr/share/figlet}/*.{t,f}lf; do j=${i##*/}; toilet -d "${i%/*}" -f "$j" "${j%.*}"; done    
 }
 prompt_zsh_GPMSong () {
-  #if [`uname -s` = "Darwin"]; then
+  if [[ $machine == 'Mac' ]]
+  then
     conf=$(cat ~/Library/Application\ Support/Google\ Play\ Music\ Desktop\ Player/json_store/playback.json )
-  #else
-  #fi
+  else
+    conf=$(cat ~/.config/Google\ Play\ Music\ Desktop\ Player/json_store/playback.json )
+  fi
   playico=`echo '\UF04B'` # in orange
   state='false'
   if state=`echo $conf | jq '.playing' -r 2> /dev/null`; then
@@ -78,8 +61,6 @@ prompt_zsh_GPMSong () {
      echo -n "$playico $artist - $track";
   fi
 }
-source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 #powerlevel9K specific changes
 POWERLEVEL9K_CUSTOM_SONG="prompt_zsh_GPMSong"
 POWERLEVEL9K_CUSTOM_SONG_BACKGROUND="009"
@@ -88,8 +69,12 @@ POWERLEVEL9K_SHORTEN_DIR_LENGTH=3
 POWERLEVEL9K_DIR_DEFAULT_FOREGROUND="236"
 POWERLEVEL9K_SHORTEN_STRATEGY="truncate_middle"
 POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon context dir vcs)
-#POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(icons_test)
-POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load battery time)
+if [[ `uname` == 'Darwin' ]]
+then
+  POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load battery time)
+else
+  POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load time)
+fi
 POWERLEVEL9K_MULTILINE_FIRST_PROMPT_PREFIX=""
 POWERLEVEL9K_MULTILINE_SECOND_PROMPT_PREFIX="%{%B%F{yellow}%K{blue}%} ❯%{%b%f%k%F{blue}%}\UE0C0 %{%f%}"
 POWERLEVEL9K_CHANGESET_HASH_LENGTH=5
@@ -239,14 +224,4 @@ echo $url >> $file
 #echo 'IconIndex=0' >> $file
 
 }
-
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-source $HOME/.cargo/env
-
-# Usage: compresspdf [input file] [output file] [screen*|ebook|printer|prepress]
-compresspdf() {
-    gs -sDEVICE=pdfwrite -dNOPAUSE -dQUIET -dBATCH -dPDFSETTINGS=/${3:-"screen"} -dCompatibilityLevel=1.4 -sOutputFile="$2" "$1"
-}
-
-alias lc='colorls -r'
-
+#source $HOME/.cargo/env
