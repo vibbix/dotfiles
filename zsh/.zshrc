@@ -229,3 +229,4 @@ echo $url >> $file
 #source $HOME/.cargo/env
 export PATH="/usr/local/sbin:$PATH"
 [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+# [[ -s "/home/vibbix/.gvm/scripts/gvm" ]] && source "/home/vibbix/.gvm/scripts/gvm"
