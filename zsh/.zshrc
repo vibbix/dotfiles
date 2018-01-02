@@ -12,32 +12,38 @@ export GOPATH="$HOME/go"
 export TOILET_FONT_PATH="/usr/share/figlet"
 export gorp="fuck off"
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-
+export HOSTNAME="$(hostname)"
 if [[ $machine == 'Mac' ]]
 then
+  export ZSH="/Users/$(whoami)/.oh-my-zsh"
   export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:$PATH
   export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
   # g cloud
-  source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
-  source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
-  # virtualenv
-  export WORKON_HOME=~/virtualenvs
-  source /usr/local/bin/virtualenvwrapper.sh
+  if [[ $HOSTNAME -ne 'ma-lt-mbeznos' ]]
+  then
+    source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
+    source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
+    # virtualenv
+    export WORKON_HOME=~/virtualenvs
+    source /usr/local/bin/virtualenvwrapper.sh
+  fi
   # Path to your oh-my-zsh installation.
-  export ZSH=/Users/vibbix/.oh-my-zsh
   export NVM_DIR="$HOME/.nvm"
   plugins=(gitfast docker osx web-search vscode tmux)
   source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 else
   #ZSH_THEME="agnoster"
-  export ZSH=/home/vibbix/.oh-my-zsh
+  export ZSH="/home/$(whoami)/.oh-my-zsh"
   #source ./zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   plugins=(gitfast vscode tmux)
 fi
-ZSH_THEME="powerlevel9k/powerlevel9k"
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+  ZSH_THEME="dieter"
+else
+  ZSH_THEME="powerlevel9k/powerlevel9k"
+fi
 POWERLEVEL9K_MODE='awesome-fontconfig'
-
 source $ZSH/oh-my-zsh.sh
 alias gorp="toilet -d $TOILET_FONT_PATH -f 3d  \"$gorp\" | lolcat -t -a"
 function toiletfonts(){
@@ -70,7 +76,7 @@ POWERLEVEL9K_CUSTOM_SONG_FOREGROUND="236"
 POWERLEVEL9K_SHORTEN_DIR_LENGTH=3
 POWERLEVEL9K_DIR_DEFAULT_FOREGROUND="236"
 POWERLEVEL9K_SHORTEN_STRATEGY="truncate_middle"
-POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon context dir vcs)
+POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir vcs)
 if [[ `uname` == 'Darwin' ]]
 then
   POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load battery time)
