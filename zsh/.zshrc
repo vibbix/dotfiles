@@ -21,12 +21,15 @@ then
   # g cloud
   if [[ $HOSTNAME -ne 'ma-lt-mbeznos' ]]
   then
-    source '~/.workconf.zsh'
     source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
     source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
     # virtualenv
     export WORKON_HOME=~/virtualenvs
     source /usr/local/bin/virtualenvwrapper.sh
+    POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir vcs) #fix for MASSIVE git repo
+  else
+    source $HOME/.workconf.sh
+    POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir) #fix for MASSIVE git repo
   fi
   # Path to your oh-my-zsh installation.
   export NVM_DIR="$HOME/.nvm"
@@ -77,7 +80,7 @@ POWERLEVEL9K_CUSTOM_SONG_FOREGROUND="236"
 POWERLEVEL9K_SHORTEN_DIR_LENGTH=3
 POWERLEVEL9K_DIR_DEFAULT_FOREGROUND="236"
 POWERLEVEL9K_SHORTEN_STRATEGY="truncate_middle"
-POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir vcs)
+# POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir vcs)
 if [[ `uname` == 'Darwin' ]]
 then
   POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load battery time)
