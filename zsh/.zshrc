@@ -19,17 +19,16 @@ then
   export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:$PATH
   export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
   # g cloud
-  if [[ $HOSTNAME -ne 'ma-lt-mbeznos' ]]
-  then
+  if [ $(uname -n) = 'ma-lt-mbeznos' ]; then
+    source $HOME/.workconf.sh
+    POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir) #fix for MASSIVE git repo
     source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
     source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
-    # virtualenv
+  else
+   # virtualenv
     export WORKON_HOME=~/virtualenvs
     source /usr/local/bin/virtualenvwrapper.sh
     POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir vcs) #fix for MASSIVE git repo
-  else
-    source $HOME/.workconf.sh
-    POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir) #fix for MASSIVE git repo
   fi
   # Path to your oh-my-zsh installation.
   export NVM_DIR="$HOME/.nvm"
