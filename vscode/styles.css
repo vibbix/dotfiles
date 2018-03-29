@@ -1,0 +1,37 @@
+/* comment example */
+/* @media screen {
+  .mtk5 .mtk4 .mtk7 {
+    font-family: "Operator Mono", 'OperatorMonoLig-BookItalic', "Operator Mono Lig", 'OperatorMonoLig-MediumItalic';
+    font-style: italic;
+  }
+}
+
+.mtk7 .mtk4 .{
+  font-family: 'OperatorMonoLig-BookItalic';
+  font-style: italic;
+}
+
+span.mtk4 {
+  font-family: 'OperatorMonoLig-BookItalic';
+  font-style: italic;
+} */
+/*comments*/
+span.mtk4 {
+  font-family: 'OperatorMonoLig-BookItalic';
+  font-style: italic;
+}
+/*Attributes*/
+span.mtk5 {
+  font-family: 'OperatorMonoLig-BookItalic';
+  font-style: italic;
+}
+/*Attributes*/
+span.mtk7 {
+  font-family: 'OperatorMonoLig-BookItalic';
+  font-style: italic;
+}
+/*block comments*/
+span.mtk3 {
+  font-family: 'OperatorMonoLig-BookItalic';
+  font-style: italic;
+}

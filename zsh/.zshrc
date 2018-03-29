@@ -41,7 +41,7 @@ else
   #source ./zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   plugins=(gitfast vscode tmux)
 fi
-if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [[ $TERM_PROGRAM = 'vscode' ]]; then
   ZSH_THEME="dieter"
 else
   ZSH_THEME="powerlevel9k/powerlevel9k"
@@ -244,3 +244,5 @@ function initmappings(){
   ln -sf ~/git/dotfiles/hyper/.hyper.js ~/.hyper.js
   ln -sf ~/git/dotfiles/zsh/.zshrc ~/.zshrc
 }
+
+source /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
