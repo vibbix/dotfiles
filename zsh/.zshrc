@@ -21,9 +21,7 @@ then
   # g cloud
   if [ $(uname -n) = 'ma-lt-mbeznos' ]; then
     source $HOME/.workconf.sh
-    POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir) #fix for MASSIVE git repo
-    source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
-    source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
+    POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir ) #fix for MASSIVE git repo
   else
    # virtualenv
     export WORKON_HOME=~/virtualenvs
@@ -35,13 +33,15 @@ then
   plugins=(gitfast docker osx web-search vscode tmux)
   source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+  test -e '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc' && source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
+  test -e '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc' && source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
 else
   #ZSH_THEME="agnoster"
   export ZSH="/home/$(whoami)/.oh-my-zsh"
   #source ./zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   plugins=(gitfast vscode tmux)
 fi
-if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [[ $TERM_PROGRAM = 'vscode' ]]; then
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [[ $TERM_PROGRAM = 'vscode' ]] || [ -n "$TMUX" ]; then
   ZSH_THEME="dieter"
 else
   ZSH_THEME="powerlevel9k/powerlevel9k"
