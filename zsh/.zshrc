@@ -246,3 +246,9 @@ function initmappings(){
 }
 
 source /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# fh - repeat history
+fh() {
+  print -z $( ([ -n "$ZSH_NAME" ] && fc -l 1 || history) | fzf +s --tac | sed 's/ *[0-9]* *//')
+}
+alias weather="curl https://wttr.in"
