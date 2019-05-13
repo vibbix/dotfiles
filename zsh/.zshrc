@@ -13,10 +13,10 @@ export TOILET_FONT_PATH="/usr/share/figlet"
 export gorp="fuck off"
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 export HOSTNAME="$(hostname)"
+export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:$PATH
 if [[ $machine == 'Mac' ]]
 then
   export ZSH="/Users/$(whoami)/.oh-my-zsh"
-  export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:$PATH
   export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
   # g cloud
   if [ $(uname -n) = 'ma-lt-mbeznos' ]; then
@@ -245,7 +245,8 @@ function initmappings(){
   ln -sf ~/git/dotfiles/zsh/.zshrc ~/.zshrc
 }
 
-source /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+[[ -s "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] && source "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+
 
 # fh - repeat history
 fh() {
