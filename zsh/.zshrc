@@ -259,3 +259,4 @@ export PATH="$HOME/flutter/bin:$PATH"
 
 # added by travis gem
 [ -f /Users/vibbix/.travis/travis.sh ] && source /Users/vibbix/.travis/travis.sh
+[[ -s "$HOME/.workconf.sh" ]] && source "$HOME/.workconf.sh"
