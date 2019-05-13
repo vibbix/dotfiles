@@ -13,7 +13,6 @@ export TOILET_FONT_PATH="/usr/share/figlet"
 export gorp="fuck off"
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 export HOSTNAME="$(hostname)"
-export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:$PATH
 if [[ $machine == 'Mac' ]]
 then
   export ZSH="/Users/$(whoami)/.oh-my-zsh"
@@ -36,11 +35,13 @@ then
   test -e '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc' && source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
   test -e '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc' && source '/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
 else
+  export ANDROID_HOME="$HOME/.android_home"
   #ZSH_THEME="agnoster"
   export ZSH="/home/$(whoami)/.oh-my-zsh"
   #source ./zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   plugins=(gitfast vscode tmux)
 fi
+export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:$PATH
 if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [[ $TERM_PROGRAM = 'vscode' ]] || [ -n "$TMUX" ]; then
   ZSH_THEME="dieter"
 else
