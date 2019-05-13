@@ -82,7 +82,7 @@ POWERLEVEL9K_SHORTEN_STRATEGY="truncate_middle"
 # POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir vcs)
 if [[ `uname` == 'Darwin' ]]
 then
-  POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load battery time)
+  POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load time)
 else
   POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load time)
 fi
@@ -252,3 +252,8 @@ fh() {
   print -z $( ([ -n "$ZSH_NAME" ] && fc -l 1 || history) | fzf +s --tac | sed 's/ *[0-9]* *//')
 }
 alias weather="curl https://wttr.in"
+
+export PATH="$HOME/flutter/bin:$PATH"
+
+# added by travis gem
+[ -f /Users/vibbix/.travis/travis.sh ] && source /Users/vibbix/.travis/travis.sh
