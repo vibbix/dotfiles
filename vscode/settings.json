@@ -1,4 +1,13 @@
 {
     "workbench.colorTheme": "Shades of Purple",
-    "team.showWelcomeMessage": false
+    "team.showWelcomeMessage": false,
+    "[json]": {
+        "editor.defaultFormatter": "HookyQR.beautify"
+    },
+    "[html]": {
+        "editor.defaultFormatter": "HookyQR.beautify"
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "HookyQR.beautify"
+    }
 }

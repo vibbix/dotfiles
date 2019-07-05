@@ -9,6 +9,7 @@ case "${unameOut}" in
 esac
 export GOPATH="$HOME/go"
 #export TERM="screen-256color"
+export D9HOME="/Users/vibbix/git/d9"
 export TOILET_FONT_PATH="/usr/share/figlet"
 export gorp="fuck off"
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
