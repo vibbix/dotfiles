@@ -1,0 +1,63 @@
+#!/bin/sh
+POWERLEVEL9K_MODE='awesome-fontconfig'
+prompt_zsh_GPMSong () {
+  if [[ $machine == 'Mac' ]]
+  then
+    conf=$(cat ~/Library/Application\ Support/Google\ Play\ Music\ Desktop\ Player/json_store/playback.json )
+  else
+    conf=$(cat ~/.config/Google\ Play\ Music\ Desktop\ Player/json_store/playback.json )
+  fi
+  playico=`echo '\UF04B'` # in orange
+  state='false'
+  if state=`echo $conf | jq '.playing' -r 2> /dev/null`; then
+  else
+    conf=`echo $conf | tr -cd '[:print:]'`
+    state=`echo $conf | jq '.playing' -r 2> /dev/null`
+  fi
+  if [[ $state == "true" ]]; then
+     artist=`echo $conf | jq '.song.artist' | tr -d '"'`;
+     track=`echo $conf | jq '.song.title' | tr -d '"'`;
+     echo -n "$playico $artist - $track";
+  fi
+}
+#powerlevel9K specific changes
+POWERLEVEL9K_CUSTOM_SONG="prompt_zsh_GPMSong"
+POWERLEVEL9K_CUSTOM_SONG_BACKGROUND="009"
+POWERLEVEL9K_CUSTOM_SONG_FOREGROUND="236"
+POWERLEVEL9K_SHORTEN_DIR_LENGTH=3
+POWERLEVEL9K_DIR_DEFAULT_FOREGROUND="236"
+POWERLEVEL9K_SHORTEN_STRATEGY="truncate_middle"
+# POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(status os_icon dir vcs)
+if [[ `uname` == 'Darwin' ]]
+then
+  POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load time)
+else
+  POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(custom_song virtualenv load time)
+fi
+POWERLEVEL9K_MULTILINE_FIRST_PROMPT_PREFIX=""
+POWERLEVEL9K_MULTILINE_SECOND_PROMPT_PREFIX="%{%B%F{yellow}%K{blue}%} ❯%{%b%f%k%F{blue}%}\UE0C0 %{%f%}"
+POWERLEVEL9K_CHANGESET_HASH_LENGTH=5
+POWERLEVEL9K_PROMPT_ON_NEWLINE=true
+POWERLEVEL9K_BATTERY_LOW_BACKGROUND="black"
+POWERLEVEL9K_BATTERY_CHARGING_BACKGROUND="black"
+POWERLEVEL9K_BATTERY_CHARGED_BACKGROUND="black"
+POWERLEVEL9K_BATTERY_DISCONNECTED_BACKGROUND="black"
+POWERLEVEL9K_BATTERY_LOW_FOREGROUND="249"
+POWERLEVEL9K_BATTERY_CHARGING_FOREGROUND="249"
+POWERLEVEL9K_BATTERY_CHARGED_FOREGROUND="249"
+POWERLEVEL9K_BATTERY_DISCONNECTED_FOREGROUND="249"
+POWERLEVEL9K_BATTERY_LOW_VISUAL_IDENTIFIER_COLOR="red"
+POWERLEVEL9K_BATTERY_CHARGING_VISUAL_IDENTIFIER_COLOR="yellow"
+POWERLEVEL9K_BATTERY_CHARGED_VISUAL_IDENTIFIER_COLOR="green"
+POWERLEVEL9K_BATTERY_DISCONNECTED_VISUAL_IDENTIFIER_COLOR="249"
+POWERLEVEL9K_BATTERY_ICON="\uF240 "
+POWERLEVEL9K_RUST_ICON="\uE7A8"
+POWERLEVEL9K_TIME_BACKGROUND="white"
+POWERLEVEL9K_TIME_FOREGROUND="black"
+POWERLEVEL9K_TIME_FORMAT="%D{%H:%M:%S} \uF017"
+POWERLEVEL9K_LEFT_SEGMENT_SEPARATOR='\uE0C0'
+POWERLEVEL9K_RIGHT_SEGMENT_SEPARATOR='\UE0C2'
+POWERLEVEL9K_LEFT_SUBSEGMENT_SEPARATOR='\uE0B1'
+POWERLEVEL9K_RIGHT_SUBSEGMENT_SEPARATOR='\uE0B2'
+#POWERLEVEL9K_MULTILINE_FIRST_PROMPT_PREFIX="%{%F{249}%}\u250f"
+#POWERLEVEL9K_MULTILINE_SECOND_PROMPT_PREFIX="%{%F{249}%}\u2517%{%F{default}%} 
