@@ -18,5 +18,10 @@
     "gitlens.views.fileHistory.location": "gitlens",
     "gitlens.views.lineHistory.location": "gitlens",
     "gitlens.views.compare.location": "gitlens",
-    "gitlens.views.search.location": "gitlens"
+    "gitlens.views.search.location": "gitlens",
+    "go.useLanguageServer": true,
+    "editor.fontFamily": "'Operator Mono', Menlo, Monaco, 'Courier New', monospace",
+    "editor.fontLigatures": true,
+    "vsicons.dontShowNewVersionMessage": true,
+    "extensions.autoUpdate": false,
 }

@@ -14,6 +14,7 @@ then
   export D9HOME="/Users/vibbix/git/d9"
   export ZSH="/Users/$(whoami)/.oh-my-zsh"
   export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
+  ZSH_THEME="powerlevel10k/powerlevel10k"
   # g cloud
   # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
   if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [[ $TERM_PROGRAM = 'vscode' ]] || [ -n "$TMUX" ]; then
@@ -60,3 +61,11 @@ alias weather="curl https://wttr.in"
 [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 export PATH="/usr/local/opt/ant@1.9/bin:$PATH"
 alias introduce="figlet -f slant -c $HOSTNAME | lolcat && neofetch"
+
+# # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+# [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+
+# export PATH="/Users/vibbix/.pyenv/bin:$PATH"
+# eval "$(pyenv init -)"
+# eval "$(pyenv virtualenv-init -)"
+# export MSBuildSDKsPath=/usr/local/share/dotnet/sdk/3.0.101/Sdks
