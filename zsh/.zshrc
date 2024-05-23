@@ -81,7 +81,7 @@ if [[ -d "$HOME/.nvm" ]]; then
   fi
 fi
 
-if [[ -d "$HOME/.pyenv"]]; then
+if [[ -d "$HOME/.pyenv" ]]; then
   export PYENV_ROOT="$HOME/.pyenv"
   [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
   eval "$(pyenv init -)"
