@@ -87,7 +87,7 @@ if [[ -d "$HOME/.pyenv" ]]; then
   eval "$(pyenv init -)"
 fi
 
-if [[-d "$HOME/.dotnet"]]; then
+if [[ -d "$HOME/.dotnet" ]]; then
   export DOTNET_ROOT=$HOME/.dotnet
 fi
 
