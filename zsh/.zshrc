@@ -26,6 +26,13 @@ then
   # Path to your oh-my-zsh installation.
   plugins=(docker macos web-search vscode tmux)
   test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+  # pnpm
+  export PNPM_HOME="/Users/mbeznos/Library/pnpm"
+  case ":$PATH:" in
+    *":$PNPM_HOME:"*) ;;
+    *) export PATH="$PNPM_HOME:$PATH" ;;
+  esac
+  # pnpm end
 else
   export ANDROID_HOME="$HOME/.android_home"
   export ZSH="/home/$(whoami)/.oh-my-zsh"
