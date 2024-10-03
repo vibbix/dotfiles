@@ -60,7 +60,6 @@ alias weather="curl https://wttr.in"
 # added by travis gem
 #[ -f /Users/vibbix/.travis/travis.sh ] && source /Users/vibbix/.travis/travis.sh
 #source $DOTFILESROOT/zsh/gitstatus/gitstatus.prompt.zsh
-[[ -s "$HOME/.workconf.sh" ]] && source "$HOME/.workconf.sh"
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 export PATH="/usr/local/opt/ant@1.9/bin:$PATH"
@@ -101,7 +100,20 @@ if [[ -d "$HOME/.dotnet" ]]; then
   export DOTNET_ROOT=$HOME/.dotnet
 fi
 
-alias rebasebranch='git fetch && git rebase origin/main && git push --force-with-lease'
+# This only work if remote is setup
+# TODO: create a fallback
+alias gettrunkname="git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'"
+
+# Rebase branch on trunk, while moving trunk to the latest from origin
+function rebasebranch() {
+  TRUNKNAME=$(gettrunkname)
+  git fetch origin $TRUNKNAME:$TRUNKNAME && git rebase origin/$TRUNKNAME && git push --force-with-lease
+}
+
+alias switchmain="git checkout -B main origin/main"
+
+# Overrides for local env
+[[ -s "$HOME/.workconf.sh" ]] && source "$HOME/.workconf.sh"
 
 # bun completions
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
@@ -111,6 +123,6 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 # if WSL, use widnows' 1pass
-if [[ -d  "/mnt/wsl" ]]; then 
+if [[ -d  "/mnt/wsl" ]]; then
   alias op="op.exe"
 fi
