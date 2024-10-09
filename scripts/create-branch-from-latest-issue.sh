@@ -22,11 +22,19 @@
 # Done:
 # - replaced FZF with jira-cli native selection
 # - Have dialog for uncommited changes
+# - Add colors
+# - Added colon to santize branch name
 
 set -f
 # split at newlines only
 IFS='
 '
+
+RED="\e[31m"
+GREEN="\e[32m"
+NC="\e[0m"
+
+
 # IFS=$'\n'
 # requires see's if the utility is installed
 requires() {
@@ -71,7 +79,7 @@ sanitize_branch_name()
     tr -d '\r' | \
     tr -d '\n' | \
     tr -d '\t' | \
-    sed -E -e 's/(^|[\/.])([\/.]|$)|^@$|@{|[\x00-\x20\x7f~^:?*;"'"'"'`&|$()!\][\\]|\.lock(\/|$)|\S/-/g' -e 's/-{2,}/-/g'
+    sed -E -e 's/(^|[\/.])([\/.]|$)|:^@$|@{|[\x00-\x20\x7f~^:?*;"'"'"'`&|$()!\][\\]|\.lock(\/|$)|\S/-/g' -e 's/-{2,}/-/g'
 }
 
 get_type_name() {
@@ -87,28 +95,29 @@ get_type_name() {
 }
 
 function _handle_changes_in_existing_branch() {
-  echo "Changes detected in current branch. What would you like to do?"
-  echo "1) Keep changes and continue"
-  echo "2) Stash changes and continue"
-  echo "3) View changes and repeat dialog"
-  echo "4) Exit script"
+  echo "${RED}$1${NC} Changes detected in current branch. What would you like to do?"
+  echo "${RED}1)$NC Keep changes and continue"
+  echo "${RED}2)$NC Stash changes and continue"
+  echo "${RED}3)$NC View changes and repeat dialog"
+  echo "${RED}4)$NC Exit script"
   read -r -p "Please select an option: " choice
   case $choice in
     1)
+      #continue
       ;;
     2)
       git stash
       ;;
     3)
       git diff
-      _handle_changes_in_existing_branch
+      _handle_changes_in_existing_branch "$1"
       ;;
     4)
       exit 1
       ;;
     *)
       echo "Invalid choice"
-      _handle_changes_in_existing_branch
+      _handle_changes_in_existing_branch "$1"
       ;;
   esac
 }
@@ -134,14 +143,14 @@ if ! _GIT_STATUS=$(git status --porcelain); then
 fi
 
 if [ -n "$_GIT_STATUS" ]; then
-  _handle_changes_in_existing_branch
+  _changes=$(trim "$(wc -l <<< $_GIT_STATUS)")
+  _handle_changes_in_existing_branch "$_changes"
 fi
 
 LOCAL_TRUNK_NAME=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
 
-
 # perform a git pull?
-me=$(jira me)
+# me=$(jira me)
 # used if patch isn't installed
 #SELECTED_ISSUE=$(ccjira issue list -a$me --paginate 10 -sopen -s"In Progress" --plain | fzf --header-lines=1)
 # TODO: add custom JQL here? IO want to see all issues assigned to me, or created by me but unassigned
@@ -162,14 +171,14 @@ echo "What would you like your branch name to be? (default: '$default_branch_nam
 read -r -e -i "$default_branch_name" chosen_branch_name
 
 #TODO: santize branch name
-echo "Creating branch: $chosen_branch_name"
+echo "Creating branch: ${GREEN}$chosen_branch_name${NC}"
 
 _CURRENT_BRANCH=$(git branch --show-current)
 
 if [ "$LOCAL_TRUNK_NAME" != "$_CURRENT_BRANCH" ]; then
-  echo "Currently on $_CURRENT_BRANCH. Switching to $LOCAL_TRUNK_NAME"
-  git switch $LOCAL_TRUNK_NAME
+  echo "Currently on ${RED}${_CURRENT_BRANCH}${NC}. Switching to ${GREEN}${LOCAL_TRUNK_NAME}${NC}"
+  git switch "$LOCAL_TRUNK_NAME"
 fi
 
 git -c gc.auto=0 pull
-git switch -c $chosen_branch_name
+git switch -c "$chosen_branch_name"
