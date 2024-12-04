@@ -27,6 +27,8 @@
 # - Added colon to santize branch name
 
 # CHANGELOG
+# [V0.1.9] - 12/04/2024
+# - Added stash/pop dialog choice for uncommited changes
 # [V0.1.8] - 11/20/2024
 # - Updated query to sort tickets by status
 # [v0.1.7] - 11/02/2024
@@ -45,7 +47,7 @@ RED=$(tput setaf 1)
 GREEN="$(tput setaf 2)"
 BLUE=$(tput setaf 4)
 NC="$(tput sgr0)"
-VERSION="v0.1.8"
+VERSION="v0.1.9"
 
 # IFS=$'\n'
 # requires see's if the utility is installed
@@ -112,14 +114,16 @@ get_type_name() {
 function _handle_changes_in_existing_branch() {
   local changes="$1"
   printf "${RED}%d${NC} Changes detected in current branch. What would you like to do?\n" "$changes"
-  printf "${RED}1)$NC Do nothing and continue\n"
+  printf "${RED}1)$NC Stash changes and unstash on branch\n"
   printf "${RED}2)$NC Stash changes and continue\n"
   printf "${RED}3)$NC View changes and repeat dialog\n"
-  printf "${RED}4)$NC Exit script\n"
+  printf "${RED}4)$NC Do nothing and continue\n"
+  printf "${RED}5)$NC Exit script\n"
   read -r -p "Please select an option: " choice
   case $choice in
     1)
-      #continue
+      git stash
+      echo "unpop"
       ;;
     2)
       git stash
@@ -130,6 +134,9 @@ function _handle_changes_in_existing_branch() {
       ;;
     4)
       exit 1
+      ;;
+    5)
+      #continue
       ;;
     *)
       echo "Invalid choice"
@@ -183,7 +190,7 @@ requires jq
 requires perl
 
 # default query - All open tickets either assigned to user, or created by user but unnasigned, sorted by latest
-QUERY='((assignee = currentUser()) OR (creator = currentUser() && assignee = EMPTY)) AND (statusCategory != "Done") ORDER BY status DESC' #formerly = In Progress
+QUERY='((assignee = currentUser()) OR (creator = currentUser() && assignee = EMPTY)) AND (statusCategory != "Done")' #formerly = In Progress
 
 if ! _GIT_STATUS=$(git status --porcelain); then
   echo "Not a git repository" >&2
@@ -202,11 +209,13 @@ if [ -z "$SELECTED_ISSUE" ]; then
   echo "No issue selected" >&2
   exit 1
 fi
+
+_handled_changes=""
 #check for changes
 if [ -n "$_GIT_STATUS" ]; then
   _changes=$(_trim "$(wc -l <<< $_GIT_STATUS)")
   if [ $_changes -gt 0 ]; then
-    _handle_changes_in_existing_branch "$_changes"
+    _handled_changes=$(_handle_changes_in_existing_branch "$_changes")
   fi
 fi
 
@@ -237,3 +246,7 @@ fi
 #TODO: have git GC write to stderr, or just dropped entirely
 git -c gc.auto=0 pull
 git switch -c "$chosen_branch_name"
+
+if [ -n "$_handled_changes" ]; then
+  git stash pop
+fi
