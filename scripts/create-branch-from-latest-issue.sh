@@ -27,6 +27,8 @@
 # - Added colon to santize branch name
 
 # CHANGELOG
+# [V0.1.10] - 1/29/2024
+# - Adding fix for unpopping branch names
 # [V0.1.9] - 12/04/2024
 # - Added stash/pop dialog choice for uncommited changes
 # [V0.1.8] - 11/20/2024
@@ -111,6 +113,7 @@ get_type_name() {
   fi
 }
 
+_handled_changes=""
 function _handle_changes_in_existing_branch() {
   local changes="$1"
   printf "${RED}%d${NC} Changes detected in current branch. What would you like to do?\n" "$changes"
@@ -123,7 +126,7 @@ function _handle_changes_in_existing_branch() {
   case $choice in
     1)
       git stash
-      echo "unpop"
+      _handled_changes="unpop"
       ;;
     2)
       git stash
@@ -210,12 +213,11 @@ if [ -z "$SELECTED_ISSUE" ]; then
   exit 1
 fi
 
-_handled_changes=""
 #check for changes
 if [ -n "$_GIT_STATUS" ]; then
   _changes=$(_trim "$(wc -l <<< $_GIT_STATUS)")
   if [ $_changes -gt 0 ]; then
-    _handled_changes=$(_handle_changes_in_existing_branch "$_changes")
+    _handle_changes_in_existing_branch "$_changes"
   fi
 fi
 
@@ -247,6 +249,6 @@ fi
 git -c gc.auto=0 pull
 git switch -c "$chosen_branch_name"
 
-if [ -n "$_handled_changes" ]; then
+if [ "$_handled_changes" == "unpop" ]; then
   git stash pop
 fi
