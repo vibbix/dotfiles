@@ -2,9 +2,9 @@ export DOTFILESROOT=$HOME/git/dotfiles
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block, everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
+#if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+#  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+#fi
 source ${DOTFILESROOT}/zsh/globals.sh
 source ${DOTFILESROOT}/zsh/scripts.sh
 export HOSTNAME="$(hostname)"
@@ -13,14 +13,19 @@ then
   source ${DOTFILESROOT}/zsh/macconf.sh
   export ZSH="/Users/$(whoami)/.oh-my-zsh"
   export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
-  ZSH_THEME="powerlevel10k/powerlevel10k"
+  #ZSH_THEME="powerlevel10k/powerlevel10k"
   # g cloud
   # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
   if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [[ $TERM_PROGRAM = 'vscode' ]] || [ -n "$TMUX" ]; then
     ZSH_THEME="dieter"
   else
-    ZSH_THEME="powerlevel10k/powerlevel10k"
-    [[ -f ${DOTFILESROOT}/zsh/.p10k.zsh ]] && source ${DOTFILESROOT}/zsh/.p10k.zsh
+    if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
+      eval "$(oh-my-posh init zsh --config $DOTFILESROOT/zsh/oh-my-posh/config.json)"
+    else
+      ZSH_THEME="dieter"
+    fi
+    #ZSH_THEME="powerlevel10k/powerlevel10k"
+    #[[ -f ${DOTFILESROOT}/zsh/.p10k.zsh ]] && source ${DOTFILESROOT}/zsh/.p10k.zsh
   fi
   test -e '/usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh' && source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   # Path to your oh-my-zsh installation.
@@ -111,6 +116,18 @@ function rebasebranch() {
 }
 
 alias switchmain="git checkout -B main origin/main"
+
+#git switch main/master
+function gsm() {
+  local branch
+  branch=${1:-$(gettrunkname)}
+  git switch "$branch"
+}
+
+# Git switch main/master and pull
+function gsmp() {
+  gsm && git pull
+}
 
 # Overrides for local env
 [[ -s "$HOME/.workconf.sh" ]] && source "$HOME/.workconf.sh"

@@ -1,0 +1,49 @@
+#!/bin/bash
+#CHANGELOG:
+# [April 3rd 2025]
+# - initial version
+# - Added `uniq` check to make sure we don't double delete branches
+
+# requires see's if the utility is installed
+requires() {
+  if ! [ -x "$(command -v $1)" ]; then
+    echo Error: "$1" is not installed. >&2
+    if [ -n "$2" ]; then
+      echo "Install with $2" >&2
+      fi
+    exit 1
+  fi
+}
+
+requires git
+requires jq
+requires gh
+
+# Fetch all merged PRs and their branch names
+merged_prs=$(gh pr list --state merged --json headRefName --jq '.[].headRefName' | uniq)
+
+# Check if there are any merged PRs
+if [ -z "$merged_prs" ]; then
+    echo "No merged PRs found."
+    exit 0
+fi
+
+# Display the list of branches to be deleted
+echo "The following branches from merged PRs will be deleted:"
+echo "$merged_prs"
+
+# Ask for user confirmation
+read -r -p "Are you sure you want to delete these branches? (y/n): " confirm
+
+if [[ "$confirm" != "y" ]]; then
+    echo "Branch deletion canceled."
+    exit 0
+fi
+
+# Loop through each branch name and delete it
+for branch in $merged_prs; do
+    echo "Deleting branch: $branch"
+    git branch -d "$branch" 2>/dev/null || git branch -D "$branch"
+done
+
+echo "All merged PR branches have been deleted."
