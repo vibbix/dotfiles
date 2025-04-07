@@ -1,6 +1,10 @@
 #!/bin/bash
 #CHANGELOG:
 # [April 3rd 2025]
+# [0.0.2]
+# - Increased limit to 50
+# - set assignee to me
+# [0.0.1]
 # - initial version
 # - Added `uniq` check to make sure we don't double delete branches
 
@@ -20,7 +24,7 @@ requires jq
 requires gh
 
 # Fetch all merged PRs and their branch names
-merged_prs=$(gh pr list --state merged --json headRefName --jq '.[].headRefName' | uniq)
+merged_prs=$(gh pr list --state merged  --limit 50 --author "@me" --json headRefName --jq '.[].headRefName' | uniq)
 
 # Check if there are any merged PRs
 if [ -z "$merged_prs" ]; then
