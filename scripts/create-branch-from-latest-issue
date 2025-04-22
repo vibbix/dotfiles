@@ -27,7 +27,12 @@
 # - Added colon to santize branch name
 
 # CHANGELOG
-# [V0.1.10] - 1/29/2024
+# [V0.1.12] - 4/15/2025
+# - Added check for existing branches, so they can be deleted
+# [V0.1.11] - 4/14/2025
+# - disabled `sed` in sanitize branch name as it kept breaking with
+#   "sed: 1: "s/(^|[\/.])([\/.]|$)|:| ...": RE error: invalid character range"
+# [V0.1.10] - 1/29/2025
 # - Adding fix for unpopping branch names
 # [V0.1.9] - 12/04/2024
 # - Added stash/pop dialog choice for uncommited changes
@@ -47,21 +52,14 @@ IFS='
 
 RED=$(tput setaf 1)
 GREEN="$(tput setaf 2)"
+YELLOW="$(tput setaf 3)"
 BLUE=$(tput setaf 4)
 NC="$(tput sgr0)"
-VERSION="v0.1.9"
+VERSION="v0.1.12"
 
 # IFS=$'\n'
-# requires see's if the utility is installed
-requires() {
-  if ! [ -x "$(command -v $1)" ]; then
-    echo Error: "$1" is not installed. >&2
-    if [ -n "$2" ]; then
-      echo "Install with $2" >&2
-      fi
-    exit 1
-  fi
-}
+source "$(dirname "$0")/common.sh"
+source "$(dirname "$0")/git-common.sh"
 
 # this is broken
 to_lower() {
@@ -94,12 +92,12 @@ sanitize_branch_name()
   _trim "$1" | \
     tr -d '\r' | \
     tr -d '\n' | \
-    tr -d '\t' | \
-    sed -E -e 's/(^|[\/.])([\/.]|$)|:|#|\||^@$|@{|[\x00-\x20\x7f~^?*;"'"'"'`&|$()!\][\\]|\.lock(\/|$)|\S/-/g' -e 's/-{2,}/-/g'
+    tr -d '\t' # | \
+    #sed -E -e 's/(^|[\/.])([\/.]|$)|:|#|\||^@$|@{|[\x00-\x20\x7f~^?*;"'"'"'`&|$()!\][\\]|\.lock(\/|$)|\S/-/g' -e 's/-{2,}/-/g'
 }
 
 # Convert the Task-type to a good prefix for the branch name
-# TODO: have this be disaable with a param
+# TODO: have this be disable with a param
 get_type_name() {
   local ticket_type="$1"
   if [ $ticket_type == "Task" ]; then
@@ -117,11 +115,11 @@ _handled_changes=""
 function _handle_changes_in_existing_branch() {
   local changes="$1"
   printf "${RED}%d${NC} Changes detected in current branch. What would you like to do?\n" "$changes"
-  printf "${RED}1)$NC Stash changes and unstash on branch\n"
-  printf "${RED}2)$NC Stash changes and continue\n"
-  printf "${RED}3)$NC View changes and repeat dialog\n"
-  printf "${RED}4)$NC Do nothing and continue\n"
-  printf "${RED}5)$NC Exit script\n"
+  printf "${YELLOW}1)$NC Stash changes and unstash on branch\n"
+  printf "${YELLOW}2)$NC Stash changes and continue\n"
+  printf "${YELLOW}3)$NC View changes and repeat dialog\n"
+  printf "${YELLOW}4)$NC Do nothing and continue\n"
+  printf "${YELLOW}5)$NC Exit script\n"
   read -r -p "Please select an option: " choice
   case $choice in
     1)
@@ -182,7 +180,7 @@ function _does_branch_exist() {
 
 # Unsure why macOS has such a prehistoric version of bash
 # this is only needed because of the use of `read -i` not working on macOS
-if (($BASH_VERSINFO < 4)); then 
+if ((BASH_VERSINFO < 4)); then 
   echo "Update your bash version to 4.x or higher" >&2
   exit 1
 fi
@@ -200,7 +198,7 @@ if ! _GIT_STATUS=$(git status --porcelain); then
   exit 1 
 fi
 
-LOCAL_TRUNK_NAME=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+LOCAL_TRUNK_NAME=$(gettrunkname)
 
 # perform a git pull?
 # me=$(jira me)
@@ -215,22 +213,29 @@ fi
 
 #check for changes
 if [ -n "$_GIT_STATUS" ]; then
-  _changes=$(_trim "$(wc -l <<< $_GIT_STATUS)")
-  if [ $_changes -gt 0 ]; then
+  _changes=$(_trim "$(wc -l <<< "$_GIT_STATUS")")
+  if [ "$_changes" -gt 0 ]; then
     _handle_changes_in_existing_branch "$_changes"
   fi
 fi
 
 #TODO: assert array is one
-for s in $(echo "$SELECTED_ISSUE" | jq -r ".[0]|to_entries|map(\"\(.key)=\(.value|tostring)\").[]"); do
-  # TODO: o i need export here?
-  export _$s
+for s in $(jq -r ".[0]|to_entries|map(\"\(.key)=\(.value|tostring)\").[]" <<< "$SELECTED_ISSUE"); do
+  # TODO: do i need export here?
+  export "_$s"
 done
 _does_branch_exist "$_key"
 
-default_branch_name=$(sanitize_branch_name $(printf "%s/%s-%s" $(get_type_name $_type) $_key $(kebab_case $_summary)))
 
-echo "What would you like your branch name to be? (default: '$default_branch_name'):"
+_new_summary=$(kebab_case "$_summary")
+_mapped_type=$(get_type_name "$_type")
+#echo "sanitize_branch_name \$(printf \"%s/%s-%s\" $_mapped_type $_key $_new_summary)"
+_unclean_name=$(printf "%s/%s-%s" "$_mapped_type" "$_key" "$_new_summary")
+#echo "$_unclean_name"
+
+default_branch_name=$(sanitize_branch_name "$_unclean_name")
+
+printf "What would you like your branch name to be? (default: '${GREEN}%s${NC}'):\n" "$default_branch_name"
 read -r -e -i "$default_branch_name" chosen_branch_name
 
 #TODO: santize branch name
@@ -247,8 +252,29 @@ fi
 #TODO: optional check for this
 #TODO: have git GC write to stderr, or just dropped entirely
 git -c gc.auto=0 pull
-git switch -c "$chosen_branch_name"
 
+# 
+if [ "$LOCAL_TRUNK_NAME" != "$_CURRENT_BRANCH" ]; then
+  if branch_is_merged "$_CURRENT_BRANCH"; then 
+    # ask to delete branch
+    read -p "Would you like to delete the merged branch ${YELLOW}${_CURRENT_BRANCH}${NC}? (${RED}Y${NC}/${GREEN}N${NC}): " -i "y" -e -r choice
+    case $choice in
+      y | Y) 
+        git branch -d "$_CURRENT_BRANCH"
+        printf "Deleted branch: ${GREEN}%s${NC}\n" "$_CURRENT_BRANCH"
+        ;;
+      n | N)
+        ;;
+      *)
+        printf "Invalid choice - ${RED}quitting${NC}\n"
+        exit 1
+        ;;
+    esac
+  fi
+fi
+#
+
+git switch -c "$chosen_branch_name"
 if [ "$_handled_changes" == "unpop" ]; then
   git stash pop
 fi

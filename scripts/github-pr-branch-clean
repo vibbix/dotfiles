@@ -1,5 +1,8 @@
 #!/bin/bash
+# github-pr-branch-clean.sh
 #CHANGELOG:
+# [0.0.3]
+# - Added a dialog
 # [April 3rd 2025]
 # [0.0.2]
 # - Increased limit to 50
@@ -23,8 +26,21 @@ requires git
 requires jq
 requires gh
 
+# Check if dialog is installed
+if command -v dialog &>/dev/null; then
+  use_dialog=true
+else
+  use_dialog=false
+fi
+
+# Check for --no-dialog argument
+if [[ "$1" == "--no-dialog" ]]; then
+  use_dialog=false
+  shift
+fi
+
 # Fetch all merged PRs and their branch names
-merged_prs=$(gh pr list --state merged  --limit 50 --author "@me" --json headRefName --jq '.[].headRefName' | uniq)
+merged_prs=$(gh pr list --state merged --limit 50 --author "@me" --json headRefName --jq '.[].headRefName' | uniq)
 
 # Check if there are any merged PRs
 if [ -z "$merged_prs" ]; then

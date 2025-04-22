@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# git-switch-trunk-pull.sh (formerly git-switch-master-pull.sh or `gsmp`)
+#  - similar to "gsmp" utiility but with added smarts to delete branch if possible
+# CHANGELOG:
+# [0.0.1] April 15th 2025
+# - initial version
+
+# shellcheck source=git-common.sh
+source "$(dirname "$0")/git-common.sh"

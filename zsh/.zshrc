@@ -111,8 +111,17 @@ alias gettrunkname="git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/rem
 
 # Rebase branch on trunk, while moving trunk to the latest from origin
 function rebasebranch() {
+  local no_push=false
+  if [[ "$1" == "--no-push" || "$1" == "-n" ]]; then
+    no_push=true
+  fi
+
   TRUNKNAME=$(gettrunkname)
-  git fetch origin $TRUNKNAME:$TRUNKNAME && git rebase origin/$TRUNKNAME && git push --force-with-lease
+  git fetch origin "$TRUNKNAME:$TRUNKNAME" && git rebase origin/"$TRUNKNAME"
+
+  if ! $no_push; then
+    git push --force-with-lease
+  fi
 }
 
 alias switchmain="git checkout -B main origin/main"
@@ -131,6 +140,11 @@ function gsmp() {
 
 # Overrides for local env
 [[ -s "$HOME/.workconf.sh" ]] && source "$HOME/.workconf.sh"
+# Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
+export PATH="$PATH:$HOME/.rvm/bin"
+
+# load scripts
+export PATH="$PATH:$DOTFILESROOT/scripts/"
 
 # bun completions
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
