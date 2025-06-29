@@ -1,0 +1,1 @@
+Get-DisplayConfig | Export-Clixml $home\TVGamingProfile.xml
