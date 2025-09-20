@@ -1,4 +1,4 @@
-export DOTFILESROOT=$HOME/git/dotfiles
+export DOTFILESROOT="$(dirname "$(dirname "$(realpath "${(%):-%N}")")")"
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block, everything else may go below.
@@ -8,6 +8,7 @@ export DOTFILESROOT=$HOME/git/dotfiles
 source ${DOTFILESROOT}/zsh/globals.sh
 source ${DOTFILESROOT}/zsh/scripts.sh
 export HOSTNAME="$(hostname)"
+plugins=(web-search vscode)
 if [[ $machine == 'Mac' ]]
 then
   source ${DOTFILESROOT}/zsh/macconf.sh
@@ -29,19 +30,21 @@ then
   fi
   test -e '/usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh' && source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   # Path to your oh-my-zsh installation.
-  plugins=(docker macos web-search vscode tmux)
+  #plugins=(macos web-search vscode) #gitfast zsh-autosuggestions)
   test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
   # pnpm
-  export PNPM_HOME="/Users/mbeznos/Library/pnpm"
+  export PNPM_HOME="$HOME/Library/pnpm"
   case ":$PATH:" in
     *":$PNPM_HOME:"*) ;;
     *) export PATH="$PNPM_HOME:$PATH" ;;
   esac
+  plugins+=(macos)
+  export DYLD_FALLBACK_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
   # pnpm end
 else
   export ANDROID_HOME="$HOME/.android_home"
   export ZSH="/home/$(whoami)/.oh-my-zsh"
-  plugins=(gitfast vscode tmux)
+  plugins=(gitfast vscode)
   ZSH_THEME="dieter"
 fi
 
@@ -145,6 +148,20 @@ export PATH="$PATH:$HOME/.rvm/bin"
 
 # load scripts
 export PATH="$PATH:$DOTFILESROOT/scripts/"
+
+if command -v docker &>/dev/null; then
+  plugins+=(docker)
+fi
+
+if command -v tmux &>/dev/null; then
+  plugins+=(tmux)
+fi
+
+#https://hamatti.org/posts/guide-vs-code-to-recognising-pep-723-dependencies/
+alias uvv='f() { uv python find --script "$1" | pbcopy};f'
+
+#source oh-my-zsh after all plugins are setup
+source $ZSH/oh-my-zsh.sh
 
 # bun completions
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
