@@ -26,21 +26,51 @@ requires git
 requires jq
 requires gh
 
-# Check if dialog is installed
-if command -v dialog &>/dev/null; then
-  use_dialog=true
-else
-  use_dialog=false
-fi
+RED=$(tput setaf 1)
+GREEN="$(tput setaf 2)"
+YELLOW="$(tput setaf 3)"
+BLUE=$(tput setaf 4)
+NC="$(tput sgr0)"
+VERSION="v0.0.3"
 
-# Check for --no-dialog argument
-if [[ "$1" == "--no-dialog" ]]; then
-  use_dialog=false
-  shift
+limit=1000
+
+# # Check if dialog is installed
+# if command -v dialog &>/dev/null; then
+#   use_dialog=true
+# else
+#   use_dialog=false
+# fi
+
+# # Check for --no-dialog argument
+# if [[ "$1" == "--no-dialog" ]]; then
+#   use_dialog=false
+#   shift
+# fi
+
+# Parse args: support `--everyone` to include PRs from everyone
+everyone=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --everyone)
+      everyone=true
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# If not using --everyone, limit to PRs authored by the current user
+if [ "$everyone" = false ]; then
+  author_arg=(--author "@me")
+else
+  author_arg=()
 fi
 
 # Fetch all merged PRs and their branch names
-merged_prs=$(gh pr list --state merged --limit 50 --author "@me" --json headRefName --jq '.[].headRefName' | uniq)
+merged_prs=$(gh pr list --state merged --limit "$limit" "${author_arg[@]}" --json headRefName --jq '.[].headRefName' | uniq)
 
 # Check if there are any merged PRs
 if [ -z "$merged_prs" ]; then
@@ -48,11 +78,25 @@ if [ -z "$merged_prs" ]; then
     exit 0
 fi
 
-# Display the list of branches to be deleted
-echo "The following branches from merged PRs will be deleted:"
-echo "$merged_prs"
+# Count merged PRs (ignore empty lines)
+count=$(echo "$merged_prs" | sed '/^\s*$/d' | wc -l | tr -d ' ')
 
-# Ask for user confirmation
+# Print the count with red color
+echo -e "Found ${RED}${count}${NC} merged PR(s)."
+
+# If less than 20, display them. Otherwise ask the user if they want to list them.
+if [ "$count" -lt 20 ]; then
+  echo "Listing all merged PR branches:"
+  echo "$merged_prs"
+else
+  read -r -p "Do you want to list the merged PR branches? (y/n): " list_choice
+  if [[ "$list_choice" == "y" ]]; then
+    echo "The following branches from merged PRs will be deleted:"
+    echo "$merged_prs"
+  fi
+fi
+
+# Ask for user confirmation to delete
 read -r -p "Are you sure you want to delete these branches? (y/n): " confirm
 
 if [[ "$confirm" != "y" ]]; then

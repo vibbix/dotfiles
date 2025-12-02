@@ -39,6 +39,8 @@ then
     *) export PATH="$PNPM_HOME:$PATH" ;;
   esac
   plugins+=(macos)
+  # fix for https://github.com/astral-sh/uv/issues/7764 (Nov 3 2025)
+  HOMEBREW_PREFIX=$(brew --prefix)
   export DYLD_FALLBACK_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
   # pnpm end
 else
@@ -173,4 +175,12 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # if WSL, use widnows' 1pass
 if [[ -d  "/mnt/wsl" ]]; then
   alias op="op.exe"
+fi
+
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+if [[ $machine == 'Mac' ]]
+then
+  export PATH="/opt/homebrew/bin:$PATH"
+  export PATH="/opt/homebrew/sbin:$PATH"
 fi
