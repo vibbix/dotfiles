@@ -30,6 +30,7 @@ import re
 import subprocess
 import sys
 import argparse
+from typing import TYPE_CHECKING, Any
 
 
 from typing import Optional
@@ -54,7 +55,8 @@ from github.GithubObject import (
     as_rest_api_attributes,
     as_rest_api_attributes_list,
     is_undefined,
-    CompletableGithubObject
+    CompletableGithubObject,
+    NonCompletableGithubObject
 )
 from github.PaginatedList import PaginatedList
 
@@ -69,14 +71,15 @@ log_handler = colorlog.StreamHandler()
 log_handler.setFormatter(colorlog.ColoredFormatter(
 	'${message}', style='$'))# secondary_log_colors=secondary_log_colors
 log_handler.setLevel(level=logging.DEBUG)
+log_handler.addFilter(lambda record: record.levelno < logging.WARNING)
 
 logger.addHandler(error_handler)
 logger.addHandler(log_handler)
 logger.propagate = False
 
-class MergeCommitGQL(GraphQlObject, CompletableGithubObject):
+class MergeCommitGQL(GraphQlObject, NonCompletableGithubObject):
     def _initAttributes(self) -> None:
-        super()._initAttributes()
+        # super()._initAttributes()
         self._abbreviatedoid: Attribute[str] = NotSet
         self._id: Attribute[str] = NotSet
         self._oid: Attribute[str] = NotSet
@@ -100,7 +103,7 @@ class MergeCommitGQL(GraphQlObject, CompletableGithubObject):
     
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
         # super class is a REST API GithubObject, attributes are coming from GraphQL
-        super()._useAttributes(as_rest_api_attributes(attributes))
+        # super()._useAttributes(as_rest_api_attributes(attributes))
         if "abbreviatedOid" in attributes:
             self._abbreviatedoid = self._makeStringAttribute(attributes["abbreviatedOid"])
         if "id" in attributes:
@@ -110,13 +113,14 @@ class MergeCommitGQL(GraphQlObject, CompletableGithubObject):
         if "committedDate" in attributes:
             self._committeddate = self._makeDatetimeAttribute(attributes["committedDate"])
 
-class PullRequestGQL(GraphQlObject, CompletableGithubObject):
+class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
     def _initAttributes(self) -> None:
-        super()._initAttributes()
+        # super()._initAttributes()
         self._number: Attribute[int] = NotSet
         self._headrefname: Attribute[str] = NotSet
         self._mergecommit: Attribute[MergeCommitGQL] = NotSet
         self._merged: Attribute[bool] = NotSet
+        self._viewercandeleteheadref: Attribute[bool] = NotSet
 
     
     @property
@@ -126,19 +130,22 @@ class PullRequestGQL(GraphQlObject, CompletableGithubObject):
     @property
     def headRefName(self) -> str:
         return self._headrefname.value
-    
+
     @property
-    def mergeCommit(self) -> MergeCommitGQL | None
+    def viewerCanDeleteHeadRef(self) -> bool:
+        return self._viewercandeleteheadref.value
+
+    @property
+    def mergeCommit(self) -> MergeCommitGQL | None:
         return self._mergecommit.value
 
     @property
     def merged(self) -> bool:
         return self._merged.value
 
-
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
         # super class is a REST API GithubObject, attributes are coming from GraphQL
-        super()._useAttributes(as_rest_api_attributes(attributes))
+        # super()._useAttributes(as_rest_api_attributes(attributes))
 
         if "number" in attributes:
             self._number = self._makeIntAttribute(attributes["number"])
@@ -152,55 +159,71 @@ class PullRequestGQL(GraphQlObject, CompletableGithubObject):
         if "merged" in attributes:
             self._merged = self._makeBoolAttribute(attributes["merged"])
 
+        if "viewerCanDeleteHeadRef" in attributes:
+            self._viewercandeleteheadref = self._makeBoolAttribute(attributes["viewerCanDeleteHeadRef"])
+
 
 def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRequestGQL]:
     query = """
 fragment pr on PullRequest {
-        number
-        headRefName
-        mergeCommit {
-            abbreviatedOid
-            id
-            oid
-            committedDate
-        }
-        merged
+  number
+  headRefName
+  mergeCommit {
+    abbreviatedOid
+    id
+    oid
+    committedDate
+  }
+  merged
+  viewerCanDeleteHeadRef
 }
-query PullRequestSearch(
-    	$q: String!,
-    	$type: SearchType!,
-    	$limit: Int!,
-    	$endCursor: String,
+
+query Q(
+  $repo: String!
+  $owner: String!
+  $first: Int
+  $last: Int
+  $before: String
+  $after: String
+) {
+  repository(name: $repo, owner: $owner) {
+    pullRequests(
+      first: $first
+      last: $last
+      before: $before
+      after: $after
+      orderBy: { direction: DESC, field: UPDATED_AT }
+      states: [CLOSED, MERGED]
     ) {
-    	search(query: $q, type: $type, first: $limit, after: $endCursor) {
-            issueCount
-            nodes {
-                ...pr
-            }
-            pageInfo {
-                startCursor
-                hasNextPage
-                endCursor
-                hasPreviousPage
-            }
-    	}
-    }"""
+      totalCount
+      pageInfo {
+        startCursor
+        endCursor
+        hasNextPage
+        hasPreviousPage
+      }
+      nodes {
+        ...pr
+      }
+    }
+  }
+}
+"""
+    repo_split = repo.split("/")
     variables = {
-        "q": f"repo:{repo} is:pr is:merged",
-        "type": "ISSUE",
-        "limit": 30,
-        "endCursor": None,
+        "owner": repo_split[0],
+        "repo": repo_split[1],
     }
     return PaginatedList(
         PullRequestGQL,
-        gh.__requester,
+        gh.requester,
         graphql_query=query,
         graphql_variables=variables,
-        list_item=["nodes"],
+        list_item=["repository", "pullRequests"],
     )
-    
 
 def __get_git_repo(path: str) -> git.Repo:
+
     try:
         repo = git.Repo(path, search_parent_directories=True)
         logger.debug(f"Found git repository at {repo.working_tree_dir}")
@@ -299,9 +322,8 @@ def main(directory: str):
     logger.info("Fetching closed pull requests and filtering merged ones...")
     merged = []
     try:
-        pulls = repo.get_pulls(state='closed', sort='updated', direction='desc')
+        pulls = __get_pull_request_gql(gh, owner_repo) #repo.get_pulls(state='closed', sort='updated', direction='desc')
         for pr in tqdm(pulls, total=pulls.totalCount, desc="Processing PRs"):
-            pr.is_graphql
             try:
                 if pr.merged:
                     merged.append(pr)
@@ -310,7 +332,7 @@ def main(directory: str):
                 if getattr(pr, 'merge_commit_sha', None):
                     merged.append(pr)
     except Exception as e:
-        logger.critical(f"Error fetching PRs: {e}")
+        logger.critical(e)
         sys.exit(1)
 
     if not merged:
