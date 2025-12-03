@@ -11,5 +11,6 @@ dependencies = [
     "PyGithub~=2.8.1",
     "tqdm~=4.67.1",
     "requests-cache~=1.2.1",
-    "colorlog~=6.10.1"
+    "colorlog~=6.10.1",
+    "colorama~=0.4.6",
 ]

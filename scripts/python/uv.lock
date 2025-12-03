@@ -494,6 +494,7 @@ name = "vibbix-scripts"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "colorama" },
     { name = "colorlog" },
     { name = "gitpython" },
     { name = "pexpect" },
@@ -505,6 +506,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "colorama", specifier = "~=0.4.6" },
     { name = "colorlog", specifier = "~=6.10.1" },
     { name = "gitpython", specifier = "~=3.1.45" },
     { name = "pexpect", specifier = ">=4.9.0" },

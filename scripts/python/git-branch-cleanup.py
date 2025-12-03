@@ -7,6 +7,7 @@
 #   "tqdm~=4.67.1",
 #   "requests-cache~=1.2.1",
 #   "colorlog~=6.10.1",
+#   "colorama~=0.4.6",
 # ]
 # ///
 """
@@ -22,6 +23,7 @@ Usage:
 The script detects the repo owner/name from `git remote get-url origin`.
 It prints each merged PR number, title, branch, and commit SHA.
 """
+from datetime import datetime
 import logging
 import os
 import re
@@ -33,21 +35,189 @@ import argparse
 from typing import Optional
 from github import Github
 import github
+import git
+
 import colorlog
 
 from requests_cache import DO_NOT_CACHE, install_cache
 from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
 
+from colorama import Fore, Back, Style
 
-logger = logging.getLogger("git_branch_cleanup")
+import git
 
-def get_origin_url(cwd: str) -> Optional[str]:
+from github.GithubObject import (
+    Attribute,
+    GraphQlObject,
+    NotSet,
+    as_rest_api_attributes,
+    as_rest_api_attributes_list,
+    is_undefined,
+    CompletableGithubObject
+)
+from github.PaginatedList import PaginatedList
+
+logger = logging.getLogger(__name__)
+
+error_handler = colorlog.StreamHandler()
+error_handler.setFormatter(colorlog.ColoredFormatter(
+	'${log_color}[${levelname}] ${message}', style='$'))
+error_handler.setLevel(level=logging.WARNING)
+
+log_handler = colorlog.StreamHandler()
+log_handler.setFormatter(colorlog.ColoredFormatter(
+	'${message}', style='$'))# secondary_log_colors=secondary_log_colors
+log_handler.setLevel(level=logging.DEBUG)
+
+logger.addHandler(error_handler)
+logger.addHandler(log_handler)
+logger.propagate = False
+
+class MergeCommitGQL(GraphQlObject, CompletableGithubObject):
+    def _initAttributes(self) -> None:
+        super()._initAttributes()
+        self._abbreviatedoid: Attribute[str] = NotSet
+        self._id: Attribute[str] = NotSet
+        self._oid: Attribute[str] = NotSet
+        self._committeddate: Attribute[datetime] = NotSet
+
+    @property
+    def abbreviatedOid(self) -> str:
+        return self._abbreviatedoid.value
+    
+    @property
+    def id(self) -> str:
+        return self._id.value
+    @property
+    def oid(self) -> str:
+        return self._oid.value
+    
+    @property
+    def committedDate(self) -> datetime:
+        return self._committeddate.value
+    
+    
+    def _useAttributes(self, attributes: dict[str, Any]) -> None:
+        # super class is a REST API GithubObject, attributes are coming from GraphQL
+        super()._useAttributes(as_rest_api_attributes(attributes))
+        if "abbreviatedOid" in attributes:
+            self._abbreviatedoid = self._makeStringAttribute(attributes["abbreviatedOid"])
+        if "id" in attributes:
+            self._id = self._makeStringAttribute(attributes["id"])
+        if "oid" in attributes:
+            self._oid = self._makeStringAttribute(attributes["oid"])
+        if "committedDate" in attributes:
+            self._committeddate = self._makeDatetimeAttribute(attributes["committedDate"])
+
+class PullRequestGQL(GraphQlObject, CompletableGithubObject):
+    def _initAttributes(self) -> None:
+        super()._initAttributes()
+        self._number: Attribute[int] = NotSet
+        self._headrefname: Attribute[str] = NotSet
+        self._mergecommit: Attribute[MergeCommitGQL] = NotSet
+        self._merged: Attribute[bool] = NotSet
+
+    
+    @property
+    def number(self) -> int:
+        return self._number.value
+    
+    @property
+    def headRefName(self) -> str:
+        return self._headrefname.value
+    
+    @property
+    def mergeCommit(self) -> MergeCommitGQL | None
+        return self._mergecommit.value
+
+    @property
+    def merged(self) -> bool:
+        return self._merged.value
+
+
+    def _useAttributes(self, attributes: dict[str, Any]) -> None:
+        # super class is a REST API GithubObject, attributes are coming from GraphQL
+        super()._useAttributes(as_rest_api_attributes(attributes))
+
+        if "number" in attributes:
+            self._number = self._makeIntAttribute(attributes["number"])
+        
+        if "headRefName" in attributes:
+            self._headrefname = self._makeStringAttribute(attributes["headRefName"])
+        
+        if "mergeCommit" in attributes:
+            self._mergecommit = self._makeClassAttribute(MergeCommitGQL, attributes["mergeCommit"])
+
+        if "merged" in attributes:
+            self._merged = self._makeBoolAttribute(attributes["merged"])
+
+
+def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRequestGQL]:
+    query = """
+fragment pr on PullRequest {
+        number
+        headRefName
+        mergeCommit {
+            abbreviatedOid
+            id
+            oid
+            committedDate
+        }
+        merged
+}
+query PullRequestSearch(
+    	$q: String!,
+    	$type: SearchType!,
+    	$limit: Int!,
+    	$endCursor: String,
+    ) {
+    	search(query: $q, type: $type, first: $limit, after: $endCursor) {
+            issueCount
+            nodes {
+                ...pr
+            }
+            pageInfo {
+                startCursor
+                hasNextPage
+                endCursor
+                hasPreviousPage
+            }
+    	}
+    }"""
+    variables = {
+        "q": f"repo:{repo} is:pr is:merged",
+        "type": "ISSUE",
+        "limit": 30,
+        "endCursor": None,
+    }
+    return PaginatedList(
+        PullRequestGQL,
+        gh.__requester,
+        graphql_query=query,
+        graphql_variables=variables,
+        list_item=["nodes"],
+    )
+    
+
+def __get_git_repo(path: str) -> git.Repo:
     try:
-        out = subprocess.check_output(["git", "config", "--get", "remote.origin.url"], stderr=subprocess.DEVNULL, cwd=cwd)
-        return out.decode().strip()
-    except subprocess.CalledProcessError:
-        return None
+        repo = git.Repo(path, search_parent_directories=True)
+        logger.debug(f"Found git repository at {repo.working_tree_dir}")
+        return repo
+    except git.exc.InvalidGitRepositoryError as e:
+        logger.critical(e, exc_info=True)
+        sys.exit(1)
+
+def __get_origin_url_from_repo(repo: git.Repo) -> str:
+    try:
+        url = repo.remotes.origin.url
+        if url is None:
+            raise ValueError("Remote 'origin' has no URL.")
+        return url
+    except Exception:
+        logger.critical("Could not find git remote origin URL. Run this inside a git repo with origin remote.")
+        sys.exit(1)
 
 
 def parse_owner_repo(url: str) -> Optional[str]:
@@ -64,7 +234,28 @@ def parse_owner_repo(url: str) -> Optional[str]:
         return f"{m.group(1)}/{m.group(2)}"
     return None
 
+def __parse_github_owner_repo(url: str) -> str:
+    # support formats like:
+    # git@github.com:owner/repo.git
+    # https://github.com/owner/repo.git
+    # https://github.com/owner/repo
+    url = url.strip()
+    m = re.match(r"git@[^:]+:([^/]+)/([^.]+)(\.git)?$", url)
+    if m:
+        return f"{m.group(1)}/{m.group(2)}"
+    m = re.match(r"https?://[^/]+/([^/]+)/([^.]+)(\.git)?$", url)
+    if m:
+        return f"{m.group(1)}/{m.group(2)}"
+    logger.critical(f"Unsupported remote URL format: {url}")
+    sys.exit(1)
+
 def __get_github() -> Github:
+    """
+    Get's the Github API instance, using a token from the environment or `gh` CLI if available.
+    
+    :return: Instance of the Github API
+    :rtype: Github
+    """
     token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
     if not token:
         # Try to use the `gh` CLI token if the user is authenticated there.
@@ -91,27 +282,18 @@ def __get_github() -> Github:
         gh = Github()
     return gh
 
-
 def main(directory: str):
-    url = get_origin_url(directory)
-    if not url:
-        logger.fatal("Could not find git remote origin URL. Run this inside a git repo with origin remote.")
-        sys.exit(1)
-
-    owner_repo = parse_owner_repo(url)
-    if not owner_repo:
-        logger.fatal(f"Unsupported remote URL format: {url}")
-        sys.exit(1)
-
+    git_repo = __get_git_repo(directory)
+    url = __get_origin_url_from_repo(git_repo)
+    owner_repo = __parse_github_owner_repo(url)
     gh = __get_github()
 
     try:
         repo = gh.get_repo(owner_repo)
     except Exception as e:
-        logger.fatal(f"Failed to access repository {owner_repo}: {e}")
+        logger.critical(f"Failed to access repository {Fore.YELLOW}{owner_repo}: {e}")
         sys.exit(1)
-
-    logger.info(f"Repository: {owner_repo}")
+    logger.info(f"Loading data for repository: {Fore.YELLOW}{owner_repo}")
 
     # Fetch closed PRs and filter for merged
     logger.info("Fetching closed pull requests and filtering merged ones...")
@@ -119,6 +301,7 @@ def main(directory: str):
     try:
         pulls = repo.get_pulls(state='closed', sort='updated', direction='desc')
         for pr in tqdm(pulls, total=pulls.totalCount, desc="Processing PRs"):
+            pr.is_graphql
             try:
                 if pr.merged:
                     merged.append(pr)
@@ -127,7 +310,7 @@ def main(directory: str):
                 if getattr(pr, 'merge_commit_sha', None):
                     merged.append(pr)
     except Exception as e:
-        logger.fatal(f"Error fetching PRs: {e}")
+        logger.critical(f"Error fetching PRs: {e}")
         sys.exit(1)
 
     if not merged:
