@@ -33,27 +33,25 @@ BLUE=$(tput setaf 4)
 NC="$(tput sgr0)"
 VERSION="v0.0.3"
 
-limit=1000
+limit=5
 
-# # Check if dialog is installed
-# if command -v dialog &>/dev/null; then
-#   use_dialog=true
-# else
-#   use_dialog=false
-# fi
-
-# # Check for --no-dialog argument
-# if [[ "$1" == "--no-dialog" ]]; then
-#   use_dialog=false
-#   shift
-# fi
-
-# Parse args: support `--everyone` to include PRs from everyone
+# Parse args: support `--everyone` to include PRs from everyone and
+# `--dryrun` to avoid deleting branches
 everyone=false
+dryrun=false
+verbose=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --everyone)
       everyone=true
+      shift
+      ;;
+    --dryrun)
+      dryrun=true
+      shift
+      ;;
+    --verbose)
+      verbose=true
       shift
       ;;
     *)
@@ -70,7 +68,9 @@ else
 fi
 
 # Fetch all merged PRs and their branch names
+#gh pr list --state merged --limit 20 --json headRefName,mergeCommit,commits
 merged_prs=$(gh pr list --state merged --limit "$limit" "${author_arg[@]}" --json headRefName --jq '.[].headRefName' | uniq)
+all_branches=$(git branch -r -v)
 
 # Check if there are any merged PRs
 if [ -z "$merged_prs" ]; then
@@ -80,6 +80,10 @@ fi
 
 # Count merged PRs (ignore empty lines)
 count=$(echo "$merged_prs" | sed '/^\s*$/d' | wc -l | tr -d ' ')
+
+if [ "$verbose" = true ]; then
+  echo -e "${RED}[verbose]${NC} Found ${RED}${count}${NC} merged PR(s)."
+fi
 
 # Print the count with red color
 echo -e "Found ${RED}${count}${NC} merged PR(s)."
@@ -96,6 +100,11 @@ else
   fi
 fi
 
+# Notify when running in dry-run mode
+if [ "$dryrun" = true ]; then
+  echo "Running in dry-run mode; no branches will be deleted."
+fi
+
 # Ask for user confirmation to delete
 read -r -p "Are you sure you want to delete these branches? (y/n): " confirm
 
@@ -104,10 +113,18 @@ if [[ "$confirm" != "y" ]]; then
     exit 0
 fi
 
-# Loop through each branch name and delete it
+# Loop through each branch name and delete it (or print in dry-run)
 for branch in $merged_prs; do
-    echo "Deleting branch: $branch"
-    git branch -d "$branch" 2>/dev/null || git branch -D "$branch"
+    if [ "$dryrun" = true ]; then
+        echo -e "[dry-run] Would delete branch: ${GREEN}$branch${NC}"
+    else
+        echo -e "Deleting branch: ${RED}$branch${NC}"
+        git branch -d "$branch" 2>/dev/null || git branch -D "$branch"
+    fi
 done
 
-echo "All merged PR branches have been deleted."
+if [ "$dryrun" = true ]; then
+  echo "Dry-run complete; no branches were deleted."
+else
+  echo "All merged PR branches have been deleted."
+fi
