@@ -435,6 +435,7 @@ def __ask_question(question: str) -> bool:
     :return: True if the user answered 'yes', False if 'no'.
     :rtype: bool
     """
+    print()
     while True:
         answer = input(f"{Y}{question}{RESET} "
                        f"{Y}[{G}y{Y}/{R}n{Y}]{RESET}: ").strip().lower()
@@ -480,6 +481,8 @@ def run_script(repo_name: str | None, path: str, everyone: bool = False):
         logger.critical(e)
         sys.exit(1)
     logger.info(f"Loading data for repository: {Y}{repo.full_name}")
+    logger.info(f" There are currently {Y}{repo.get_pulls(state='open').totalCount}{RESET} open pull requests.")
+    logger.info(f" There are currently {Y}{repo.get_branches().totalCount}{RESET} branches open.")
     clean_repo(gh, repo)
 
 def clean_repo(gh: Github, repo: Repository) -> None:
@@ -536,7 +539,7 @@ def clean_repo(gh: Github, repo: Repository) -> None:
     except Exception as e:
         logger.critical(e)
         sys.exit(1)
-    can_delete.sort(key=lambda r: r.merge_commit.committed_date)
+    can_delete.sort(key=lambda r: r.merge_commit.committed_date, reverse=True)
     logger.info(f"Found {G}{len(can_delete)}{RESET} merged PR(s):")
     list_pr = __ask_question("Would you like to list all the PR's?")
     if list_pr:
@@ -546,7 +549,6 @@ def clean_repo(gh: Github, repo: Repository) -> None:
                         f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET} "
                         f"from {Y}{pr.last_commits.nodes[0].commit.abbreviated_oid}{RESET} "
                         f"on {Y}{pr.merge_commit.committed_date if pr.merge_commit else 'N/A'}{RESET} ")
-
     delete_pr = __ask_question("Would you like to delete the remote branches for these PR's?")
     if delete_pr:
         with ThreadPoolExecutor(max_workers=8) as executor:
@@ -583,11 +585,6 @@ if __name__ == '__main__':
         "--nocache",
         action="store_true",
         help="Disable HTTP caching for GitHub API requests",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force Delete branches",
     )
     parser.add_argument(
         "-y", "--yes",
