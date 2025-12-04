@@ -25,7 +25,7 @@ The script detects the repo owner/name from `git remote get-url origin`.
 It prints each merged PR number, title, branch, and commit SHA.
 """
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import logging
 import os
 import re
@@ -57,6 +57,9 @@ B = Fore.BLUE
 Y = Fore.YELLOW
 W = Fore.WHITE
 RESET = Fore.RESET
+
+VERBOSE = False
+VERY_VERBOSE = False
 
 REPLACE_URL = re.compile(r"^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)$")
 
@@ -348,7 +351,8 @@ def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRe
 def __get_git_repo(path: str) -> git.Repo:
     try:
         repo = git.Repo(path, search_parent_directories=True)
-        logger.debug(f"Found git repository at {repo.working_tree_dir}")
+        if VERBOSE:
+            logger.info(f"Found git repository at {repo.working_tree_dir}")
         return repo
     except git.exc.InvalidGitRepositoryError as e:
         logger.critical(e, exc_info=True)
@@ -402,7 +406,8 @@ def __get_github() -> Github:
                 gh_cli_token = out.decode().strip()
                 if gh_cli_token:
                     token = gh_cli_token
-                    logger.debug("Using GitHub token from `gh auth token`.")
+                    if VERBOSE:
+                        logger.info("Using GitHub token from `gh auth token`.")
             except (subprocess.CalledProcessError, FileNotFoundError):
                 # could not get token from gh; fall through to unauthenticated
                 pass
@@ -463,9 +468,7 @@ def __load_repo(gh: Github, directory: str, repo: str | None) -> Repository:
 
 def __delete_branch(pr: PullRequestGQL, force: bool = False) -> PullRequestGQL:
     try:
-        logger.info(pr.head)
         pr.delete_branch(force)
-        # repo.delete_git_ref(f"heads/{pr.headref_name}")
         logger.info(f"{G}Deleted remote branch for PR {Y}#{pr.number:<6}{RESET}: {B}{pr.headref_name}{RESET}")
         return pr
     except Exception as e:
@@ -473,7 +476,7 @@ def __delete_branch(pr: PullRequestGQL, force: bool = False) -> PullRequestGQL:
 
 
 
-def run_script(repo_name: str | None, path: str, everyone: bool = False):
+def run_script(repo_name: str | None, path: str, min_age_days: int = -1, everyone: bool = False):
     gh = __get_github()
     try:
         repo = __load_repo(gh, path, repo_name)
@@ -483,9 +486,9 @@ def run_script(repo_name: str | None, path: str, everyone: bool = False):
     logger.info(f"Loading data for repository: {Y}{repo.full_name}")
     logger.info(f" There are currently {Y}{repo.get_pulls(state='open').totalCount}{RESET} open pull requests.")
     logger.info(f" There are currently {Y}{repo.get_branches().totalCount}{RESET} branches open.")
-    clean_repo(gh, repo)
+    clean_repo(gh, repo, min_age_days)
 
-def clean_repo(gh: Github, repo: Repository) -> None:
+def clean_repo(gh: Github, repo: Repository, min_age_days: int) -> None:
     """
     Cleans up merged pull requests by deleting their remote branches if possible.
     :param repo: The GitHub repository to clean up.
@@ -518,14 +521,21 @@ def clean_repo(gh: Github, repo: Repository) -> None:
                             f"commit_date={Y}{last_commit_date}{W}.")
                         continue
                     if merge_date >= last_commit_date:
-                        can_delete.append(pr)
+                        if min_age_days > 0:
+                            if merge_date <= datetime.now(tz=timezone.utc) - timedelta(days=min_age_days):
+                                can_delete.append(pr)
+                            else:
+                                if VERBOSE:
+                                    logger.debug(f"{RESET}Skipping PR {Y}#{pr.number:<6}{W} {B}'{pr.title}{W} because it is not older than {Y}{min_age_days}{W} days ")
+                        else:
+                            can_delete.append(pr)
                     else:
                         logger.warning(
                             f"{RESET}Suspicious commit - Skipping PR {Y}#{pr.number:<6}{R} {B}'{pr.title}{W}: "
                             f"merge commit date {Y}{merge_date}{W} is before last commit date {Y}{last_commit_date}{W}.")
                 else:
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug(
+                    if VERY_VERBOSE:
+                        logger.info(
                             f"Skipping merged PR{W}: {Y}#{pr.number:<6}{W} {B}'{pr.title}{W}': "
                             f"merged={Y}{pr.merged}{W}, "
                             f"viewerCanDeleteHeadRef={Y}{pr.viewer_can_delete_head_ref}{W}, "
@@ -540,8 +550,11 @@ def clean_repo(gh: Github, repo: Repository) -> None:
         logger.critical(e)
         sys.exit(1)
     can_delete.sort(key=lambda r: r.merge_commit.committed_date, reverse=True)
-    logger.info(f"Found {G}{len(can_delete)}{RESET} merged PR(s):")
-    list_pr = __ask_question("Would you like to list all the PR's?")
+    if len(can_delete) == 0:
+        logger.info(f"{G}No merged PRs found that can be deleted.{RESET}")
+        return
+    logger.info(f"Found {G}{len(can_delete)}{RESET} applicable merged PR(s):")
+    list_pr = VERY_VERBOSE or __ask_question("Would you like to list all the PR's?")
     if list_pr:
         for pr in can_delete:
             logger.info(f"{RESET}\t#{Y}{pr.number:<6}{RESET} {B}'{pr.title}'{RESET} "
@@ -569,12 +582,13 @@ if __name__ == '__main__':
         "--path",
         nargs="?",
         default=os.getcwd(),
-        help="Path to the workspace (default: current directory)",
+        help="Path to the workspace (default: current directory). Used for auto-detecting the git repo.",
     )
     parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose (DEBUG) logging",
+        '--verbose', '-v',
+        action='count',
+        default=0,
+        help='Increase verbosity level'
     )
     parser.add_argument(
         "-f", "--force",
@@ -591,17 +605,28 @@ if __name__ == '__main__':
         action="store_true",
         help="Response with yes to everything",
     )
-
-    args = parser.parse_args()
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(message)s",
+    parser.add_argument(
+        "--min_age_days", "--min-age-days",
+        type=int,
+        default=-1,
+        help="Minimum age in days of the merged PRs to consider for branch deletion",
     )
 
+    args = parser.parse_args()
+
+    if args.verbose >= 1:
+        VERBOSE = True
+    if args.verbose >= 2:
+        VERY_VERBOSE = True
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose >= 3 else logging.INFO,
+        format="%(message)s",
+    )
     if not args.nocache:
-        logger.debug("Enabling HTTP caching for GitHub API requests...")
+        if VERBOSE:
+            logger.debug("Enabling HTTP caching for GitHub API requests...")
         install_cache(
             cache_control=True,
         )
     args = parser.parse_args()
-    run_script(args.repo, args.path)
+    run_script(args.repo, args.path, args.min_age_days)
