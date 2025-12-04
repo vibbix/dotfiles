@@ -253,8 +253,6 @@ class PullRequestGQL(GraphQlObject, PullRequest):
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
         super()._useAttributes(attributes)
         if "http_url" in attributes:
-            # replace "https://github.com/DTMX/infrastructure/pull/1690"
-            # with 'https://api.github.com/repos/DTMX/infrastructure/pulls/1146'
             api_url = REPLACE_URL.sub(lambda m: f"https://api.github.com/repos/{m.group(1)}/{m.group(2)}/pulls/{m.group(3)}",
                 attributes["http_url"])
             super()._useAttributes({"url": api_url})
