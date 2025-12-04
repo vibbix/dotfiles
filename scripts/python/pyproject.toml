@@ -1,0 +1,17 @@
+[project]
+name = "vibbix-scripts"
+version = "0.1.0"
+description = "My personal scripts"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pexpect>=4.9.0",
+    "rich>=14.0.0",
+    "gitpython~=3.1.45",
+    "PyGithub~=2.8.1",
+    "tqdm~=4.67.1",
+    "requests-cache~=1.2.1",
+    "colorlog~=6.10.1",
+    "colorama~=0.4.6",
+    "sourcetypes3~=0.1.0",
+]

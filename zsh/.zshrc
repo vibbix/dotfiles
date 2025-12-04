@@ -1,42 +1,52 @@
-export DOTFILESROOT=$HOME/git/dotfiles
+export DOTFILESROOT="$(dirname "$(dirname "$(realpath "${(%):-%N}")")")"
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block, everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
+#if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+#  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+#fi
 source ${DOTFILESROOT}/zsh/globals.sh
 source ${DOTFILESROOT}/zsh/scripts.sh
 export HOSTNAME="$(hostname)"
+plugins=(web-search vscode)
 if [[ $machine == 'Mac' ]]
 then
   source ${DOTFILESROOT}/zsh/macconf.sh
   export ZSH="/Users/$(whoami)/.oh-my-zsh"
   export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
-  ZSH_THEME="powerlevel10k/powerlevel10k"
+  #ZSH_THEME="powerlevel10k/powerlevel10k"
   # g cloud
   # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
   if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [[ $TERM_PROGRAM = 'vscode' ]] || [ -n "$TMUX" ]; then
     ZSH_THEME="dieter"
   else
-    ZSH_THEME="powerlevel10k/powerlevel10k"
-    [[ -f ${DOTFILESROOT}/zsh/.p10k.zsh ]] && source ${DOTFILESROOT}/zsh/.p10k.zsh
+    if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
+      eval "$(oh-my-posh init zsh --config $DOTFILESROOT/zsh/oh-my-posh/config.json)"
+    else
+      ZSH_THEME="dieter"
+    fi
+    #ZSH_THEME="powerlevel10k/powerlevel10k"
+    #[[ -f ${DOTFILESROOT}/zsh/.p10k.zsh ]] && source ${DOTFILESROOT}/zsh/.p10k.zsh
   fi
   test -e '/usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh' && source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   # Path to your oh-my-zsh installation.
-  plugins=(docker macos web-search vscode tmux)
+  #plugins=(macos web-search vscode) #gitfast zsh-autosuggestions)
   test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
   # pnpm
-  export PNPM_HOME="/Users/mbeznos/Library/pnpm"
+  export PNPM_HOME="$HOME/Library/pnpm"
   case ":$PATH:" in
     *":$PNPM_HOME:"*) ;;
     *) export PATH="$PNPM_HOME:$PATH" ;;
   esac
+  plugins+=(macos)
+  # fix for https://github.com/astral-sh/uv/issues/7764 (Nov 3 2025)
+  HOMEBREW_PREFIX=$(brew --prefix)
+  export DYLD_FALLBACK_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
   # pnpm end
 else
   export ANDROID_HOME="$HOME/.android_home"
   export ZSH="/home/$(whoami)/.oh-my-zsh"
-  plugins=(gitfast vscode tmux)
+  plugins=(gitfast vscode)
   ZSH_THEME="dieter"
 fi
 
@@ -60,7 +70,6 @@ alias weather="curl https://wttr.in"
 # added by travis gem
 #[ -f /Users/vibbix/.travis/travis.sh ] && source /Users/vibbix/.travis/travis.sh
 #source $DOTFILESROOT/zsh/gitstatus/gitstatus.prompt.zsh
-[[ -s "$HOME/.workconf.sh" ]] && source "$HOME/.workconf.sh"
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 export PATH="/usr/local/opt/ant@1.9/bin:$PATH"
@@ -101,7 +110,60 @@ if [[ -d "$HOME/.dotnet" ]]; then
   export DOTNET_ROOT=$HOME/.dotnet
 fi
 
-alias rebasebranch='git fetch && git rebase origin/main && git push --force-with-lease'
+# This only work if remote is setup
+# TODO: create a fallback
+alias gettrunkname="git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'"
+
+# Rebase branch on trunk, while moving trunk to the latest from origin
+function rebasebranch() {
+  local no_push=false
+  if [[ "$1" == "--no-push" || "$1" == "-n" ]]; then
+    no_push=true
+  fi
+
+  TRUNKNAME=$(gettrunkname)
+  git fetch origin "$TRUNKNAME:$TRUNKNAME" && git rebase origin/"$TRUNKNAME"
+
+  if ! $no_push; then
+    git push --force-with-lease
+  fi
+}
+
+alias switchmain="git checkout -B main origin/main"
+
+#git switch main/master
+function gsm() {
+  local branch
+  branch=${1:-$(gettrunkname)}
+  git switch "$branch"
+}
+
+# Git switch main/master and pull
+function gsmp() {
+  gsm && git pull
+}
+
+# Overrides for local env
+[[ -s "$HOME/.workconf.sh" ]] && source "$HOME/.workconf.sh"
+# Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
+export PATH="$PATH:$HOME/.rvm/bin"
+
+# load scripts
+export PATH="$PATH:$DOTFILESROOT/scripts/"
+
+if command -v docker &>/dev/null; then
+  plugins+=(docker)
+fi
+
+if command -v tmux &>/dev/null; then
+  plugins+=(tmux)
+fi
+
+#https://hamatti.org/posts/guide-vs-code-to-recognising-pep-723-dependencies/
+alias uvv='f() { uv python find --script "$1" | pbcopy};f'
+
+#source oh-my-zsh after all plugins are setup
+source $ZSH/oh-my-zsh.sh
 
 # bun completions
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
@@ -111,6 +173,14 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 # if WSL, use widnows' 1pass
-if [[ -d  "/mnt/wsl" ]]; then 
+if [[ -d  "/mnt/wsl" ]]; then
   alias op="op.exe"
+fi
+
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+if [[ $machine == 'Mac' ]]
+then
+  export PATH="/opt/homebrew/bin:$PATH"
+  export PATH="/opt/homebrew/sbin:$PATH"
 fi

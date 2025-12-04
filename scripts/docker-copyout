@@ -1,0 +1,23 @@
+#!/bin/bash
+# Usage: ./docker-copyout <image-name> <container-path> <host-path>
+
+set -e
+
+IMAGE_NAME="$1"
+CONTAINER_PATH="$2"
+HOST_PATH="$3"
+
+if [[ -z "$IMAGE_NAME" || -z "$CONTAINER_PATH" || -z "$HOST_PATH" ]]; then
+  echo "Usage: $0 <image-name> <container-path> <host-path>"
+  exit 1
+fi
+
+CONTAINER_ID=$(docker create "$IMAGE_NAME")
+docker cp "$CONTAINER_ID":"$CONTAINER_PATH" "$HOST_PATH"
+docker rm "$CONTAINER_ID"
+# Add color: green for success message, cyan for paths
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+printf "${GREEN}Copied ${CYAN}%s${GREEN} from ${CYAN}%s${GREEN} to ${CYAN}%s${NC}\n" "$CONTAINER_PATH" "$IMAGE_NAME" "$HOST_PATH"

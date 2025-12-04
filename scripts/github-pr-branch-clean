@@ -1,0 +1,130 @@
+#!/bin/bash
+# github-pr-branch-clean.sh
+#CHANGELOG:
+# [0.0.3]
+# - Added a dialog
+# [April 3rd 2025]
+# [0.0.2]
+# - Increased limit to 50
+# - set assignee to me
+# [0.0.1]
+# - initial version
+# - Added `uniq` check to make sure we don't double delete branches
+
+# requires see's if the utility is installed
+requires() {
+  if ! [ -x "$(command -v $1)" ]; then
+    echo Error: "$1" is not installed. >&2
+    if [ -n "$2" ]; then
+      echo "Install with $2" >&2
+      fi
+    exit 1
+  fi
+}
+
+requires git
+requires jq
+requires gh
+
+RED=$(tput setaf 1)
+GREEN="$(tput setaf 2)"
+YELLOW="$(tput setaf 3)"
+BLUE=$(tput setaf 4)
+NC="$(tput sgr0)"
+VERSION="v0.0.3"
+
+limit=5
+
+# Parse args: support `--everyone` to include PRs from everyone and
+# `--dryrun` to avoid deleting branches
+everyone=false
+dryrun=false
+verbose=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --everyone)
+      everyone=true
+      shift
+      ;;
+    --dryrun)
+      dryrun=true
+      shift
+      ;;
+    --verbose)
+      verbose=true
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# If not using --everyone, limit to PRs authored by the current user
+if [ "$everyone" = false ]; then
+  author_arg=(--author "@me")
+else
+  author_arg=()
+fi
+
+# Fetch all merged PRs and their branch names
+#gh pr list --state merged --limit 20 --json headRefName,mergeCommit,commits
+merged_prs=$(gh pr list --state merged --limit "$limit" "${author_arg[@]}" --json headRefName --jq '.[].headRefName' | uniq)
+all_branches=$(git branch -r -v)
+
+# Check if there are any merged PRs
+if [ -z "$merged_prs" ]; then
+    echo "No merged PRs found."
+    exit 0
+fi
+
+# Count merged PRs (ignore empty lines)
+count=$(echo "$merged_prs" | sed '/^\s*$/d' | wc -l | tr -d ' ')
+
+if [ "$verbose" = true ]; then
+  echo -e "${RED}[verbose]${NC} Found ${RED}${count}${NC} merged PR(s)."
+fi
+
+# Print the count with red color
+echo -e "Found ${RED}${count}${NC} merged PR(s)."
+
+# If less than 20, display them. Otherwise ask the user if they want to list them.
+if [ "$count" -lt 20 ]; then
+  echo "Listing all merged PR branches:"
+  echo "$merged_prs"
+else
+  read -r -p "Do you want to list the merged PR branches? (y/n): " list_choice
+  if [[ "$list_choice" == "y" ]]; then
+    echo "The following branches from merged PRs will be deleted:"
+    echo "$merged_prs"
+  fi
+fi
+
+# Notify when running in dry-run mode
+if [ "$dryrun" = true ]; then
+  echo "Running in dry-run mode; no branches will be deleted."
+fi
+
+# Ask for user confirmation to delete
+read -r -p "Are you sure you want to delete these branches? (y/n): " confirm
+
+if [[ "$confirm" != "y" ]]; then
+    echo "Branch deletion canceled."
+    exit 0
+fi
+
+# Loop through each branch name and delete it (or print in dry-run)
+for branch in $merged_prs; do
+    if [ "$dryrun" = true ]; then
+        echo -e "[dry-run] Would delete branch: ${GREEN}$branch${NC}"
+    else
+        echo -e "Deleting branch: ${RED}$branch${NC}"
+        git branch -d "$branch" 2>/dev/null || git branch -D "$branch"
+    fi
+done
+
+if [ "$dryrun" = true ]; then
+  echo "Dry-run complete; no branches were deleted."
+else
+  echo "All merged PR branches have been deleted."
+fi
