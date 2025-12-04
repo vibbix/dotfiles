@@ -33,20 +33,27 @@ import sys
 import argparse
 from typing import Any, List
 
-from typing import Optional
 from github import Github
 import github
 import git
 
 import colorlog
 from github.AuthenticatedUser import AuthenticatedUser
+from github.Repository import Repository
 
 from requests_cache import install_cache
 from tqdm import tqdm
 
 from sourcetypes import graphql
 
-from colorama import Fore, Back, Style
+from colorama import Fore
+
+R = Fore.RED
+G = Fore.GREEN
+B = Fore.BLUE
+Y = Fore.YELLOW
+W = Fore.WHITE
+RESET = Fore.RESET
 
 from github.GithubObject import (
     Attribute,
@@ -72,6 +79,7 @@ log_handler.addFilter(lambda record: record.levelno < logging.WARNING)
 logger.addHandler(error_handler)
 logger.addHandler(log_handler)
 logger.propagate = False
+
 
 class CommitGQL(GraphQlObject, NonCompletableGithubObject):
     """
@@ -186,6 +194,7 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
         self._merged: Attribute[bool] = NotSet
         self._viewer_can_delete_headref: Attribute[bool] = NotSet
         self._commits: Attribute[CommitsHolderGQL] = NotSet
+        self._url: Attribute[str] = NotSet
 
     @property
     def number(self) -> int:
@@ -214,6 +223,10 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
     @property
     def commits(self) -> CommitsHolderGQL | None:
         return self._commits.value
+
+    @property
+    def url(self) -> str:
+        return self._url.value
 
     @property
     def can_delete_branch(self) -> bool:
@@ -259,63 +272,67 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
         if "commits" in attributes:
             self._commits = self._makeClassAttribute(CommitsHolderGQL, attributes["commits"])
 
+        if "url" in attributes:
+            self._url = self._makeStringAttribute(attributes["url"])
+
 
 def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRequestGQL]:
     query: graphql = """
-fragment inner_commit on Commit {
-    abbreviatedOid
-    id
-    oid
-    committedDate
-    authoredDate
-}
+                     fragment inner_commit on Commit {
+                         abbreviatedOid
+                         id
+                         oid
+                         committedDate
+                         authoredDate
+                     }
 
-query Q(
-    $repo: String!
-    $owner: String!
-    $first: Int
-    $last: Int
-    $before: String
-    $after: String
-) {
-    repository(name: $repo, owner: $owner) {
-        pullRequests(
-            first: $first
-            last: $last
-            before: $before
-            after: $after
-            orderBy: { direction: DESC, field: UPDATED_AT }
-            states: [CLOSED, MERGED]
-        ) {
-            totalCount
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
-            }
-            nodes {
-                number
-                title
-                headRefName
-                mergeCommit {
-                    ...inner_commit
-                }
-                commits(last: 1) {
-                    totalCount
-                    nodes {
-                        commit {
-                            ...inner_commit
-                        }
-                    }
-                }
-                merged
-                viewerCanDeleteHeadRef
-            }
-        }
-    }
-}
-"""
+                     query Q(
+                         $repo: String!
+                         $owner: String!
+                         $first: Int
+                         $last: Int
+                         $before: String
+                         $after: String
+                     ) {
+                         repository(name: $repo, owner: $owner) {
+                             pullRequests(
+                                 first: $first
+                                 last: $last
+                                 before: $before
+                                 after: $after
+                                 orderBy: { direction: DESC, field: UPDATED_AT }
+                                 states: [CLOSED, MERGED]
+                             ) {
+                                 totalCount
+                                 pageInfo {
+                                     startCursor
+                                     endCursor
+                                     hasNextPage
+                                     hasPreviousPage
+                                 }
+                                 nodes {
+                                     number
+                                     title
+                                     headRefName
+                                     mergeCommit {
+                                         ...inner_commit
+                                     }
+                                     commits(last: 1) {
+                                         totalCount
+                                         nodes {
+                                             commit {
+                                                 ...inner_commit
+                                             }
+                                         }
+                                     }
+                                     merged
+                                     viewerCanDeleteHeadRef
+                                     url
+                                 }
+                             }
+                         }
+                     } \
+                     """
     repo_split = repo.split("/")
     variables = {
         "owner": repo_split[0],
@@ -348,8 +365,11 @@ def __get_origin_url_from_repo(repo: git.Repo) -> str:
             raise ValueError("Remote 'origin' has no URL.")
         return url
     except Exception as e:
-        logger.critical(Exception("Could not find git remote origin URL. Run this inside a git repo with origin remote.", e), exc_info=True)
+        logger.critical(
+            Exception("Could not find git remote origin URL. Run this inside a git repo with origin remote.", e),
+            exc_info=True)
         sys.exit(1)
+
 
 def __parse_github_owner_repo(url: str) -> str:
     # support formats like:
@@ -404,32 +424,59 @@ def __get_github() -> Github:
 def __get_me(gh: Github) -> AuthenticatedUser:
     try:
         me: AuthenticatedUser = gh.get_user()
-        logger.debug(f"Authenticated as GitHub user: {Fore.YELLOW}{me.login}")
+        logger.debug(f"Authenticated as GitHub user: {Y}{me.login}")
         return me
     except Exception as e:
         logger.critical(f"Failed to get authenticated user: {e}")
         sys.exit(1)
 
 
-def main(directory: str, everyone: bool = False) -> None:
-    git_repo = __get_git_repo(directory)
-    url = __get_origin_url_from_repo(git_repo)
-    owner_repo = __parse_github_owner_repo(url)
-    gh = __get_github()
+def __ask_question(question: str) -> bool:
+    """
+    Asks a yes/no question via input() and returns True for 'yes' and False for 'no'.
+    :param question: The question to ask the user.
+    :return: True if the user answered 'yes', False if 'no'.
+    :rtype: bool
+    """
+    while True:
+        answer = input(f"{Y}{question}{RESET} "
+                       f"{Y}[{G}y{Y}/{R}n{Y}]{RESET}: ").strip().lower()
+        if answer in ("y", "yes", "Y", "YES"):
+            return True
+        elif answer in ("n", "no", "N", "NO"):
+            return False
+        else:
+            print(f"Please enter '{G}y{RESET}' or '{R}n{RESET}'.")
 
+def __load_repo(gh: Github, directory: str, repo: str | None) -> Repository:
+    if repo is not None:
+        try:
+            return gh.get_repo(repo, lazy=False)
+        except Exception as e:
+            raise Exception(f"Failed to load repository {repo}: {e}") from e
     try:
-        repo = gh.get_repo(owner_repo)
+        git_repo = __get_git_repo(directory)
+        url = __get_origin_url_from_repo(git_repo)
+        return gh.get_repo(url, lazy=False)
     except Exception as e:
-        logger.critical(f"Failed to access repository {Fore.YELLOW}{owner_repo}: {e}")
+        raise Exception(f"Failed to detect repository from git remote: {e}") from e
+
+
+def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
+    gh = __get_github()
+    try:
+        repo = __load_repo(gh, path, repo_name)
+    except Exception as e:
+        logger.critical(e)
         sys.exit(1)
-    logger.info(f"Loading data for repository: {Fore.YELLOW}{owner_repo}")
+    logger.info(f"Loading data for repository: {Y}{repo.full_name}")
 
     # Fetch closed PRs and filter for merged
     logger.info("Fetching closed pull requests and filtering merged ones...")
-    all_prs = []
-    can_delete = []
+    all_prs: List[PullRequestGQL] = []
+    can_delete: List[PullRequestGQL] = []
     try:
-        pulls: PaginatedList[PullRequestGQL] = __get_pull_request_gql(gh,owner_repo)
+        pulls: PaginatedList[PullRequestGQL] = __get_pull_request_gql(gh, repo.full_name)
         # repo.get_pulls(state='closed', sort='updated', direction='desc')
         pr: PullRequestGQL
         for pr in tqdm(pulls, total=pulls.totalCount, desc="Processing PRs"):
@@ -438,43 +485,69 @@ def main(directory: str, everyone: bool = False) -> None:
             try:
                 if pr.merged and pr.viewer_can_delete_head_ref and pr.merge_commit is not None and pr.commits is not None and pr.commits.total_count > 0:
                     # verify that the merge commit is AFTER the last commit on the branch
-                    merge_date = min(pr.merge_commit.authored_date, pr.merge_commit.committed_date) if pr.merge_commit else None
-                    last_commit_date = max(pr.commits.nodes[0].commit.authored_date, pr.commits.nodes[0].commit.committed_date) if pr.commits and pr.commits.total_count > 0 else None
+                    merge_date = min(pr.merge_commit.authored_date,
+                                     pr.merge_commit.committed_date) if pr.merge_commit else None
+                    last_commit_date = max(pr.commits.nodes[0].commit.authored_date, pr.commits.nodes[
+                        0].commit.committed_date) if pr.commits and pr.commits.total_count > 0 else None
                     if merge_date is None or last_commit_date is None:
                         logger.warning(
-                            f"{Fore.RESET}Missing dates - Skipping PR {Fore.YELLOW}#{pr.number}{Fore.RED} {Fore.BLUE}'{pr.title}{Fore.WHITE}: "
-                            f"merge_date={Fore.YELLOW}{merge_date}{Fore.WHITE}, "
-                            f"commit_date={Fore.YELLOW}{last_commit_date}{Fore.WHITE}.")
+                            f"{RESET}Missing dates - Skipping PR {Y}#{pr.number}{R} {B}'{pr.title}{W}: "
+                            f"merge_date={Y}{merge_date}{W}, "
+                            f"commit_date={Y}{last_commit_date}{W}.")
                         continue
                     if merge_date >= last_commit_date:
                         can_delete.append(pr)
                     else:
                         logger.warning(
-                            f"{Fore.RESET}Suspicious commit - Skipping PR {Fore.YELLOW}#{pr.number}{Fore.RED} {Fore.BLUE}'{pr.title}{Fore.WHITE}: "
-                            f"merge commit date {Fore.YELLOW}{merge_date}{Fore.WHITE} is before last commit date {Fore.YELLOW}{last_commit_date}{Fore.WHITE}.")
+                            f"{RESET}Suspicious commit - Skipping PR {Y}#{pr.number}{R} {B}'{pr.title}{W}: "
+                            f"merge commit date {Y}{merge_date}{W} is before last commit date {Y}{last_commit_date}{W}.")
                 else:
-                    logger.info(
-                        f"Skipping merged PR{Fore.WHITE}: {Fore.YELLOW}#{pr.number}{Fore.WHITE} {Fore.BLUE}'{pr.title}{Fore.WHITE}': "
-                        f"merged={Fore.YELLOW}{pr.merged}{Fore.WHITE}, "
-                        f"viewerCanDeleteHeadRef={Fore.YELLOW}{pr.viewer_can_delete_head_ref}{Fore.WHITE}, "
-                        f"mergeCommit={Fore.YELLOW}{'present' if pr.merge_commit else 'absent'}{Fore.WHITE}, "
-                        f"commits_count={Fore.YELLOW}{pr.commits.total_count if pr.commits else 'N/A'}{Fore.WHITE}")
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            f"Skipping merged PR{W}: {Y}#{pr.number}{W} {B}'{pr.title}{W}': "
+                            f"merged={Y}{pr.merged}{W}, "
+                            f"viewerCanDeleteHeadRef={Y}{pr.viewer_can_delete_head_ref}{W}, "
+                            f"mergeCommit={Y}{'present' if pr.merge_commit else 'absent'}{W}, "
+                            f"commits_count={Y}{pr.commits.total_count if pr.commits else 'N/A'}{W}")
             except Exception as e:
-                logger.error(f"Error processing PR {Fore.YELLOW}#{pr.number}{Fore.WHITE} {Fore.BLUE}'{pr.title}{Fore.WHITE}: {e}", exc_info=True)
+                logger.error(
+                    f"Error processing PR {Y}#{pr.number}{W} {B}'{pr.title}{W}: {e}",
+                    exc_info=True)
                 continue
     except Exception as e:
         logger.critical(e)
         sys.exit(1)
 
-    logger.info(f"Found {Fore.GREEN}{len(can_delete)}{Fore.RESET} merged PR(s):")
+    logger.info(f"Found {G}{len(can_delete)}{RESET} merged PR(s):")
+    list_pr = __ask_question("Would you like to list all the PR's?")
+    if list_pr:
+        for pr in can_delete:
+            logger.info(f"{RESET}  #{Y}{pr.number}{RESET} {B}'{pr.title}{RESET}' "
+                        f"on branch {Y}{pr.headref_name}{RESET} "
+                        f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET}")
+
+    delete_pr = __ask_question("Would you like to delete the remote branches for these PR's?")
+    if delete_pr:
+        for pr in tqdm(can_delete):
+            try:
+                repo.delete_git_ref(f"heads/{pr.headref_name}")
+                logger.info(f"{G}Deleted remote branch for PR #{pr.number}: {pr.headref_name}{RESET}")
+            except Exception as e:
+                logger.error(f"{R}Failed to delete remote branch for PR #{pr.number}: {pr.headref_name}: {e}{RESET}")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Clean up local git branches for merged PRs.")
     parser.add_argument(
-        "path",
+        "repo",
         nargs="?",
-        default= os.getcwd(),
+        default=None,
+        help="the repository in the format 'owner/repo' (default: detected from git remote origin)",
+    )
+    parser.add_argument(
+        "--path",
+        nargs="?",
+        default=os.getcwd(),
         help="Path to the workspace (default: current directory)",
     )
     parser.add_argument(
@@ -487,11 +560,6 @@ if __name__ == '__main__':
         action="store_true",
         help="Forces update check even if not needed",
     )
-    # parser.add_argument(
-    #     "--everyone",
-    #     action="store_true",
-    #     help="Get for everyone",
-    # )
     parser.add_argument(
         "--nocache",
         action="store_true",
@@ -511,4 +579,4 @@ if __name__ == '__main__':
         )
     # parser.add_argument("--color_main", help="Node name to trace and color path to (default: main)", default="main")
     args = parser.parse_args()
-    main(args.path)
+    main(args.repo, args.path)
