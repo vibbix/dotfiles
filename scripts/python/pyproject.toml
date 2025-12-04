@@ -13,4 +13,5 @@ dependencies = [
     "requests-cache~=1.2.1",
     "colorlog~=6.10.1",
     "colorama~=0.4.6",
+    "sourcetypes3~=0.1.0",
 ]

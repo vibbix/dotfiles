@@ -8,6 +8,7 @@
 #   "requests-cache~=1.2.1",
 #   "colorlog~=6.10.1",
 #   "colorama~=0.4.6",
+#   "sourcetypes3~=0.1.0",
 # ]
 # ///
 """
@@ -38,10 +39,12 @@ import github
 import git
 
 import colorlog
+from github.AuthenticatedUser import AuthenticatedUser
 
-from requests_cache import DO_NOT_CACHE, install_cacheß
+from requests_cache import install_cache
 from tqdm import tqdm
-from tqdm.contrib.concurrent import thread_map
+
+from sourcetypes import graphql
 
 from colorama import Fore, Back, Style
 
@@ -49,10 +52,6 @@ from github.GithubObject import (
     Attribute,
     GraphQlObject,
     NotSet,
-    as_rest_api_attributes,
-    as_rest_api_attributes_list,
-    is_undefined,
-    CompletableGithubObject,
     NonCompletableGithubObject
 )
 from github.PaginatedList import PaginatedList
@@ -61,12 +60,12 @@ logger = logging.getLogger(__name__)
 
 error_handler = colorlog.StreamHandler()
 error_handler.setFormatter(colorlog.ColoredFormatter(
-	'${log_color}[${levelname}] ${message}', style='$'))
+    '${log_color}[${levelname}] ${message}', style='$'))
 error_handler.setLevel(level=logging.WARNING)
 
 log_handler = colorlog.StreamHandler()
 log_handler.setFormatter(colorlog.ColoredFormatter(
-	'${message}', style='$'))# secondary_log_colors=secondary_log_colors
+    '${message}', style='$'))  # secondary_log_colors=secondary_log_colors
 log_handler.setLevel(level=logging.DEBUG)
 log_handler.addFilter(lambda record: record.levelno < logging.WARNING)
 
@@ -74,28 +73,39 @@ logger.addHandler(error_handler)
 logger.addHandler(log_handler)
 logger.propagate = False
 
-class MergeCommitGQL(GraphQlObject, NonCompletableGithubObject):
+class CommitGQL(GraphQlObject, NonCompletableGithubObject):
+    """
+    Represents a Git commit.
+    Attributes:
+        abbreviated_oid (str): The abbreviated object ID of the commit.
+        id (str): The unique identifier of the commit.
+        oid (str): The full object ID of the commit.
+        committed_date (datetime): The date when the commit was made.
+        authored_date (datetime): The date when the commit was authored.
+    """
+
     def _initAttributes(self) -> None:
         # super()._initAttributes()
-        self._abbreviatedoid: Attribute[str] = NotSet
+        self._abbreviated_oid: Attribute[str] = NotSet
         self._id: Attribute[str] = NotSet
         self._oid: Attribute[str] = NotSet
-        self._committeddate: Attribute[datetime] = NotSet
-        self._authoreddate: Attribute[datetime] = NotSet
+        self._committed_date: Attribute[datetime] = NotSet
+        self._authored_date: Attribute[datetime] = NotSet
 
     @property
-    def abbreviatedOid(self) -> str:
-        return self._abbreviatedoid.value
-    
+    def abbreviated_oid(self) -> str:
+        return self._abbreviated_oid.value
+
     @property
     def id(self) -> str:
         return self._id.value
+
     @property
     def oid(self) -> str:
         return self._oid.value
-    
+
     @property
-    def committedDate(self) -> datetime:
+    def committed_date(self) -> datetime:
         """
         The commit date gets changed every time the commit is being modified, 
         for example when rebasing the branch where the commit is in on another branch.
@@ -104,10 +114,10 @@ class MergeCommitGQL(GraphQlObject, NonCompletableGithubObject):
         :return: Description
         :rtype: datetime
         """
-        return self._committeddate.value
-    
+        return self._committed_date.value
+
     @property
-    def authoredDate(self) -> datetime:
+    def authored_date(self) -> datetime:
         """
         The author date notes when this commit was originally made (i.e. when you finished the git commit). 
         According to the docs of git commit, the author date could be overridden using the --date switch.
@@ -116,53 +126,67 @@ class MergeCommitGQL(GraphQlObject, NonCompletableGithubObject):
         :return: Description
         :rtype: datetime
         """
-        return self._authoreddate.value
-    
+        return self._authored_date.value
+
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
         # super class is a REST API GithubObject, attributes are coming from GraphQL
         # super()._useAttributes(as_rest_api_attributes(attributes))
         if "abbreviatedOid" in attributes:
-            self._abbreviatedoid = self._makeStringAttribute(attributes["abbreviatedOid"])
+            self._abbreviated_oid = self._makeStringAttribute(attributes["abbreviatedOid"])
         if "id" in attributes:
             self._id = self._makeStringAttribute(attributes["id"])
         if "oid" in attributes:
             self._oid = self._makeStringAttribute(attributes["oid"])
         if "committedDate" in attributes:
-            self._committeddate = self._makeDatetimeAttribute(attributes["committedDate"])
+            self._committed_date = self._makeDatetimeAttribute(attributes["committedDate"])
         if "authoredDate" in attributes:
-            self._authoreddate = self._makeDatetimeAttribute(attributes["authoredDate"])
+            self._authored_date = self._makeDatetimeAttribute(attributes["authoredDate"])
+
+
+class PullRequestCommit(GraphQlObject, NonCompletableGithubObject):
+    def _initAttributes(self) -> None:
+        self._commit: Attribute[CommitGQL] = NotSet
+
+    @property
+    def commit(self) -> CommitGQL:
+        return self._commit.value
+
+    def _useAttributes(self, attributes: dict[str, Any]) -> None:
+        if "commit" in attributes:
+            self._commit = self._makeClassAttribute(CommitGQL, attributes["commit"])
+
 
 class CommitsHolderGQL(GraphQlObject, NonCompletableGithubObject):
     def _initAttributes(self) -> None:
-        # super()._initAttributes()
-        self._totalcount: Attribute[int] = NotSet
-        self._nodes: Attribute[List[MergeCommitGQL]] = NotSet
+        self._total_count: Attribute[int] = NotSet
+        self._nodes: Attribute[List[PullRequestCommit]] = NotSet
 
     @property
-    def totalCount(self) -> int:
-        return self._totalcount.value
-    
+    def total_count(self) -> int:
+        return self._total_count.value
+
     @property
-    def nodes(self) -> List[MergeCommitGQL]:
+    def nodes(self) -> List[PullRequestCommit]:
         return self._nodes.value
-    
+
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
         if "totalCount" in attributes:
-            self._totalcount = self._makeIntAttribute(attributes["totalCount"])
+            self._total_count = self._makeIntAttribute(attributes["totalCount"])
         if "nodes" in attributes:
-            self._nodes = self._makeListOfClassesAttribute(MergeCommitGQL, attributes["nodes"])
+            self._nodes = self._makeListOfClassesAttribute(PullRequestCommit, attributes["nodes"])
+
 
 class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
     def _initAttributes(self) -> None:
         # super()._initAttributes()
         self._number: Attribute[int] = NotSet
         self._title: Attribute[str] = NotSet
-        self._headrefname: Attribute[str] = NotSet
-        self._mergecommit: Attribute[MergeCommitGQL] = NotSet
+        self._headref_name: Attribute[str] = NotSet
+        self._merge_commit: Attribute[CommitGQL] = NotSet
         self._merged: Attribute[bool] = NotSet
-        self._viewercandeleteheadref: Attribute[bool] = NotSet
+        self._viewer_can_delete_headref: Attribute[bool] = NotSet
         self._commits: Attribute[CommitsHolderGQL] = NotSet
-    
+
     @property
     def number(self) -> int:
         return self._number.value
@@ -172,16 +196,16 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
         return self._title.value
 
     @property
-    def headRefName(self) -> str:
-        return self._headrefname.value
+    def headref_name(self) -> str:
+        return self._headref_name.value
 
     @property
-    def viewerCanDeleteHeadRef(self) -> bool:
-        return self._viewercandeleteheadref.value
+    def viewer_can_delete_head_ref(self) -> bool:
+        return self._viewer_can_delete_headref.value
 
     @property
-    def mergeCommit(self) -> MergeCommitGQL | None:
-        return self._mergecommit.value
+    def merge_commit(self) -> CommitGQL | None:
+        return self._merge_commit.value
 
     @property
     def merged(self) -> bool:
@@ -190,10 +214,9 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
     @property
     def commits(self) -> CommitsHolderGQL | None:
         return self._commits.value
-    
 
     @property
-    def canDeleteBranch(self) -> bool:
+    def can_delete_branch(self) -> bool:
         """
         Determines if the branch associated with this pull request can be deleted.
         The branch can be deleted if:
@@ -206,12 +229,12 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
         :rtype: bool
         """
         return (
-            self.merged
-            and self.viewerCanDeleteHeadRef
-            and self.mergeCommit is not None
-            and self.commits is not None
-            and self.commits.totalCount > 0
-            and len(self.commits.nodes) > 0
+                self.merged
+                and self.viewer_can_delete_head_ref
+                and self.merge_commit is not None
+                and self.commits is not None
+                and self.commits.total_count > 0
+                and len(self.commits.nodes) > 0
         )
 
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
@@ -220,24 +243,25 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
 
         if "title" in attributes:
             self._title = self._makeStringAttribute(attributes["title"])
-        
+
         if "headRefName" in attributes:
-            self._headrefname = self._makeStringAttribute(attributes["headRefName"])
-        
+            self._headref_name = self._makeStringAttribute(attributes["headRefName"])
+
         if "mergeCommit" in attributes:
-            self._mergecommit = self._makeClassAttribute(MergeCommitGQL, attributes["mergeCommit"])
+            self._merge_commit = self._makeClassAttribute(CommitGQL, attributes["mergeCommit"])
 
         if "merged" in attributes:
             self._merged = self._makeBoolAttribute(attributes["merged"])
 
         if "viewerCanDeleteHeadRef" in attributes:
-            self._viewercandeleteheadref = self._makeBoolAttribute(attributes["viewerCanDeleteHeadRef"])
+            self._viewer_can_delete_headref = self._makeBoolAttribute(attributes["viewerCanDeleteHeadRef"])
 
         if "commits" in attributes:
             self._commits = self._makeClassAttribute(CommitsHolderGQL, attributes["commits"])
 
+
 def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRequestGQL]:
-    query = """
+    query: graphql = """
 fragment inner_commit on Commit {
     abbreviatedOid
     id
@@ -291,13 +315,12 @@ query Q(
         }
     }
 }
-
 """
     repo_split = repo.split("/")
     variables = {
         "owner": repo_split[0],
         "repo": repo_split[1],
-        
+
     }
     return PaginatedList(
         PullRequestGQL,
@@ -307,8 +330,8 @@ query Q(
         list_item=["repository", "pullRequests"],
     )
 
-def __get_git_repo(path: str) -> git.Repo:
 
+def __get_git_repo(path: str) -> git.Repo:
     try:
         repo = git.Repo(path, search_parent_directories=True)
         logger.debug(f"Found git repository at {repo.working_tree_dir}")
@@ -317,30 +340,16 @@ def __get_git_repo(path: str) -> git.Repo:
         logger.critical(e, exc_info=True)
         sys.exit(1)
 
+
 def __get_origin_url_from_repo(repo: git.Repo) -> str:
     try:
         url = repo.remotes.origin.url
         if url is None:
             raise ValueError("Remote 'origin' has no URL.")
         return url
-    except Exception:
-        logger.critical("Could not find git remote origin URL. Run this inside a git repo with origin remote.")
+    except Exception as e:
+        logger.critical(Exception("Could not find git remote origin URL. Run this inside a git repo with origin remote.", e), exc_info=True)
         sys.exit(1)
-
-
-def parse_owner_repo(url: str) -> Optional[str]:
-    # support formats like:
-    # git@github.com:owner/repo.git
-    # https://github.com/owner/repo.git
-    # https://github.com/owner/repo
-    url = url.strip()
-    m = re.match(r"git@[^:]+:([^/]+)/([^.]+)(\.git)?$", url)
-    if m:
-        return f"{m.group(1)}/{m.group(2)}"
-    m = re.match(r"https?://[^/]+/([^/]+)/([^.]+)(\.git)?$", url)
-    if m:
-        return f"{m.group(1)}/{m.group(2)}"
-    return None
 
 def __parse_github_owner_repo(url: str) -> str:
     # support formats like:
@@ -357,12 +366,13 @@ def __parse_github_owner_repo(url: str) -> str:
     logger.critical(f"Unsupported remote URL format: {url}")
     sys.exit(1)
 
+
 def __get_github() -> Github:
     """
-    Get's the Github API instance, using a token from the environment or `gh` CLI if available.
+    Gets the GitHub API instance, using a token from the environment or `gh` CLI if available.
     
-    :return: Instance of the Github API
-    :rtype: Github
+    :return: Instance of the GitHub API
+    :rtype: GitHub
     """
     token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
     if not token:
@@ -390,7 +400,18 @@ def __get_github() -> Github:
         gh = Github(per_page=100)
     return gh
 
-def main(directory: str):
+
+def __get_me(gh: Github) -> AuthenticatedUser:
+    try:
+        me: AuthenticatedUser = gh.get_user()
+        logger.debug(f"Authenticated as GitHub user: {Fore.YELLOW}{me.login}")
+        return me
+    except Exception as e:
+        logger.critical(f"Failed to get authenticated user: {e}")
+        sys.exit(1)
+
+
+def main(directory: str, everyone: bool = False) -> None:
     git_repo = __get_git_repo(directory)
     url = __get_origin_url_from_repo(git_repo)
     owner_repo = __parse_github_owner_repo(url)
@@ -408,35 +429,52 @@ def main(directory: str):
     all_prs = []
     can_delete = []
     try:
-        pulls = __get_pull_request_gql(gh, owner_repo) #repo.get_pulls(state='closed', sort='updated', direction='desc')
+        pulls: PaginatedList[PullRequestGQL] = __get_pull_request_gql(gh,owner_repo)
+        # repo.get_pulls(state='closed', sort='updated', direction='desc')
+        pr: PullRequestGQL
         for pr in tqdm(pulls, total=pulls.totalCount, desc="Processing PRs"):
             all_prs.append(pr)
             # Required: merged, can delete ref, and merge commit
-            if pr.merged and pr.viewerCanDeleteHeadRef and pr.mergeCommit and pr.commits and pr.commits.totalCount > 0:
-                # verify that the merge commit is AFTER the last commit on the branch
-                merge_date = min(pr.mergeCommit.authoredDate, pr.mergeCommit.committedDate) if pr.mergeCommit else None
-                commit_date = max(pr.commits.nodes[0].authoredDate, pr.commits.nodes[0].committedDate) if pr.commits and pr.commits.totalCount > 0 else None
-                if merge_date is None or commit_date is None:
-                    logger.warning(f"{Fore.RESET}Missing dates - Skipping PR {Fore.RED}#{pr.number}{Fore.RESET} '{pr.title}': merge_date={merge_date}, commit_date={commit_date}.")
-                    continue
-                if merge_date <= commit_date:
-                    can_delete.append(pr)
+            try:
+                if pr.merged and pr.viewer_can_delete_head_ref and pr.merge_commit is not None and pr.commits is not None and pr.commits.total_count > 0:
+                    # verify that the merge commit is AFTER the last commit on the branch
+                    merge_date = min(pr.merge_commit.authored_date, pr.merge_commit.committed_date) if pr.merge_commit else None
+                    last_commit_date = max(pr.commits.nodes[0].commit.authored_date, pr.commits.nodes[0].commit.committed_date) if pr.commits and pr.commits.total_count > 0 else None
+                    if merge_date is None or last_commit_date is None:
+                        logger.warning(
+                            f"{Fore.RESET}Missing dates - Skipping PR {Fore.YELLOW}#{pr.number}{Fore.RED} {Fore.BLUE}'{pr.title}{Fore.WHITE}: "
+                            f"merge_date={Fore.YELLOW}{merge_date}{Fore.WHITE}, "
+                            f"commit_date={Fore.YELLOW}{last_commit_date}{Fore.WHITE}.")
+                        continue
+                    if merge_date >= last_commit_date:
+                        can_delete.append(pr)
+                    else:
+                        logger.warning(
+                            f"{Fore.RESET}Suspicious commit - Skipping PR {Fore.YELLOW}#{pr.number}{Fore.RED} {Fore.BLUE}'{pr.title}{Fore.WHITE}: "
+                            f"merge commit date {Fore.YELLOW}{merge_date}{Fore.WHITE} is before last commit date {Fore.YELLOW}{last_commit_date}{Fore.WHITE}.")
                 else:
-                    logger.warning(f"{Fore.RESET}Suspicious commit - Skipping PR {Fore.RED}#{pr.number}{Fore.RESET} '{pr.title}': merge commit date {merge_date} is before last commit date {commit_date}.")
-            else:
-                logger.info(f"Skipping merged PR: {Fore.RED}#{pr.number}{Fore.RESET} '{pr.title}': merged={pr.merged}, viewerCanDeleteHeadRef={pr.viewerCanDeleteHeadRef}, mergeCommit={'present' if pr.mergeCommit else 'absent'}, commits_count={pr.commits.totalCount if pr.commits else 'N/A'}")
+                    logger.info(
+                        f"Skipping merged PR{Fore.WHITE}: {Fore.YELLOW}#{pr.number}{Fore.WHITE} {Fore.BLUE}'{pr.title}{Fore.WHITE}': "
+                        f"merged={Fore.YELLOW}{pr.merged}{Fore.WHITE}, "
+                        f"viewerCanDeleteHeadRef={Fore.YELLOW}{pr.viewer_can_delete_head_ref}{Fore.WHITE}, "
+                        f"mergeCommit={Fore.YELLOW}{'present' if pr.merge_commit else 'absent'}{Fore.WHITE}, "
+                        f"commits_count={Fore.YELLOW}{pr.commits.total_count if pr.commits else 'N/A'}{Fore.WHITE}")
+            except Exception as e:
+                logger.error(f"Error processing PR {Fore.YELLOW}#{pr.number}{Fore.WHITE} {Fore.BLUE}'{pr.title}{Fore.WHITE}: {e}", exc_info=True)
+                continue
     except Exception as e:
         logger.critical(e)
         sys.exit(1)
 
     logger.info(f"Found {Fore.GREEN}{len(can_delete)}{Fore.RESET} merged PR(s):")
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Clean up local git branches for merged PRs.")
     parser.add_argument(
         "path",
         nargs="?",
-        default="/Users/vibbix/git/dtmx/infrastructure",#$os.getcwd(),
+        default= os.getcwd(),
         help="Path to the workspace (default: current directory)",
     )
     parser.add_argument(
@@ -470,10 +508,6 @@ if __name__ == '__main__':
         logger.info("Enabling HTTP caching for GitHub API requests...")
         install_cache(
             cache_control=True,
-            # urls_expire_after={
-            #     '*.github.com': 360,  # Placeholder expiration; should be overridden by Cache-Control
-            #     '*': DO_NOT_CACHE,    # Don't cache anything other than GitHub requests
-            # },
         )
     # parser.add_argument("--color_main", help="Node name to trace and color path to (default: main)", default="main")
     args = parser.parse_args()

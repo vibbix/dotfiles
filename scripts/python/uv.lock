@@ -448,6 +448,18 @@ wheels = [
 ]
 
 [[package]]
+name = "sourcetypes3"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/53/99/85ade3f627ab26927818f4c2eb05f65272f0b622a6ea0b3660d34ae43d28/sourcetypes3-0.1.0.tar.gz", hash = "sha256:71b89236516cd095257a07c385ef33807c1261b5205fcbc2674d2ccbd77ecbf6", size = 3807, upload-time = "2025-04-04T16:00:48.059Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b4/2a/a605a9ad30a55afd7ca808cac5e4fe645c7a4a0f496dd996b2c8a426cb67/sourcetypes3-0.1.0-py3-none-any.whl", hash = "sha256:a68383c4ef68a2c7000aa8b1fd65581b1f8ce0a1ff7f22a06ed5ee8e2455a64d", size = 4022, upload-time = "2025-04-04T16:00:46.764Z" },
+]
+
+[[package]]
 name = "tqdm"
 version = "4.67.1"
 source = { registry = "https://pypi.org/simple" }
@@ -501,6 +513,7 @@ dependencies = [
     { name = "pygithub" },
     { name = "requests-cache" },
     { name = "rich" },
+    { name = "sourcetypes3" },
     { name = "tqdm" },
 ]
 
@@ -513,5 +526,6 @@ requires-dist = [
     { name = "pygithub", specifier = "~=2.8.1" },
     { name = "requests-cache", specifier = "~=1.2.1" },
     { name = "rich", specifier = ">=14.0.0" },
+    { name = "sourcetypes3", specifier = "~=0.1.0" },
     { name = "tqdm", specifier = "~=4.67.1" },
 ]
