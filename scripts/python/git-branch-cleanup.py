@@ -221,8 +221,8 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
         return self._merged.value
 
     @property
-    def commits(self) -> CommitsHolderGQL | None:
-        return self._commits.value
+    def last_commits(self) -> CommitsHolderGQL | None:
+        return self._last_commits.value
 
     @property
     def url(self) -> str:
@@ -245,9 +245,9 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
                 self.merged
                 and self.viewer_can_delete_head_ref
                 and self.merge_commit is not None
-                and self.commits is not None
-                and self.commits.total_count > 0
-                and len(self.commits.nodes) > 0
+                and self.last_commits is not None
+                and self.last_commits.total_count > 0
+                and len(self.last_commits.nodes) > 0
         )
 
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
@@ -269,8 +269,8 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
         if "viewerCanDeleteHeadRef" in attributes:
             self._viewer_can_delete_headref = self._makeBoolAttribute(attributes["viewerCanDeleteHeadRef"])
 
-        if "commits" in attributes:
-            self._commits = self._makeClassAttribute(CommitsHolderGQL, attributes["commits"])
+        if "last_commits" in attributes:
+            self._last_commits = self._makeClassAttribute(CommitsHolderGQL, attributes["last_commits"])
 
         if "url" in attributes:
             self._url = self._makeStringAttribute(attributes["url"])
@@ -483,12 +483,12 @@ def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
             all_prs.append(pr)
             # Required: merged, can delete ref, and merge commit
             try:
-                if pr.merged and pr.viewer_can_delete_head_ref and pr.merge_commit is not None and pr.commits is not None and pr.commits.total_count > 0:
+                if pr.merged and pr.viewer_can_delete_head_ref and pr.merge_commit is not None and pr.last_commits is not None and pr.last_commits.total_count > 0:
                     # verify that the merge commit is AFTER the last commit on the branch
                     merge_date = min(pr.merge_commit.authored_date,
                                      pr.merge_commit.committed_date) if pr.merge_commit else None
-                    last_commit_date = max(pr.commits.nodes[0].commit.authored_date, pr.commits.nodes[
-                        0].commit.committed_date) if pr.commits and pr.commits.total_count > 0 else None
+                    last_commit_date = max(pr.last_commits.nodes[0].commit.authored_date, pr.last_commits.nodes[
+                        0].commit.committed_date) if pr.last_commits and pr.last_commits.total_count > 0 else None
                     if merge_date is None or last_commit_date is None:
                         logger.warning(
                             f"{RESET}Missing dates - Skipping PR {Y}#{pr.number}{R} {B}'{pr.title}{W}: "
@@ -508,7 +508,7 @@ def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
                             f"merged={Y}{pr.merged}{W}, "
                             f"viewerCanDeleteHeadRef={Y}{pr.viewer_can_delete_head_ref}{W}, "
                             f"mergeCommit={Y}{'present' if pr.merge_commit else 'absent'}{W}, "
-                            f"commits_count={Y}{pr.commits.total_count if pr.commits else 'N/A'}{W}")
+                            f"commits_count={Y}{pr.last_commits.total_count if pr.last_commits else 'N/A'}{W}")
             except Exception as e:
                 logger.error(
                     f"Error processing PR {Y}#{pr.number}{W} {B}'{pr.title}{W}: {e}",
