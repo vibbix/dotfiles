@@ -473,7 +473,8 @@ def __delete_branch(pr: PullRequestGQL, force: bool = False) -> PullRequestGQL:
         logger.warning(f"Failed to delete remote branch for PR #{pr.number}", e)
 
 
-def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
+
+def run_script(repo_name: str | None, path: str, everyone: bool = False):
     gh = __get_github()
     try:
         repo = __load_repo(gh, path, repo_name)
@@ -481,7 +482,16 @@ def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
         logger.critical(e)
         sys.exit(1)
     logger.info(f"Loading data for repository: {Y}{repo.full_name}")
+    clean_repo(gh, repo)
 
+def clean_repo(gh: Github, repo: Repository) -> None:
+    """
+    Cleans up merged pull requests by deleting their remote branches if possible.
+    :param repo: The GitHub repository to clean up.
+    :type repo: Repository
+    :return: None
+    :rtype: None
+    """
     # Fetch closed PRs and filter for merged
     logger.debug("Fetching closed pull requests and filtering merged ones...")
     all_prs: List[PullRequestGQL] = []
@@ -576,6 +586,16 @@ if __name__ == '__main__':
         action="store_true",
         help="Disable HTTP caching for GitHub API requests",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force Delete branches",
+    )
+    parser.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        help="Response with yes to everything",
+    )
 
     args = parser.parse_args()
     logging.basicConfig(
@@ -589,4 +609,4 @@ if __name__ == '__main__':
             cache_control=True,
         )
     args = parser.parse_args()
-    main(args.repo, args.path)
+    run_script(args.repo, args.path)
