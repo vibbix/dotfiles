@@ -24,6 +24,7 @@ Usage:
 The script detects the repo owner/name from `git remote get-url origin`.
 It prints each merged PR number, title, branch, and commit SHA.
 """
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import logging
 import os
@@ -36,9 +37,11 @@ from typing import Any, List
 from github import Github
 import github
 import git
+import re
 
 import colorlog
 from github.AuthenticatedUser import AuthenticatedUser
+from github.PullRequest import PullRequest
 from github.Repository import Repository
 
 from requests_cache import install_cache
@@ -54,6 +57,8 @@ B = Fore.BLUE
 Y = Fore.YELLOW
 W = Fore.WHITE
 RESET = Fore.RESET
+
+REPLACE_URL = re.compile(r"^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)$")
 
 from github.GithubObject import (
     Attribute,
@@ -184,25 +189,26 @@ class CommitsHolderGQL(GraphQlObject, NonCompletableGithubObject):
             self._nodes = self._makeListOfClassesAttribute(PullRequestCommit, attributes["nodes"])
 
 
-class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
+class PullRequestGQL(GraphQlObject, PullRequest):
+    """
+    Represents a GitHub Pull Request with additional GraphQL attributes.
+    Extends the standard PullRequest class from PyGithub.
+    Attributes:
+        headref_name (str): The name of the head reference (branch) for the pull
+        request.
+        merge_commit (CommitGQL | None): The commit that merged the pull request,
+        if available.
+        viewer_can_delete_head_ref (bool): Indicates if the viewer can delete the
+        head reference.
+        last_commits (CommitsHolderGQL | None): The last commits associated with
+        the pull request.
+    """
     def _initAttributes(self) -> None:
-        # super()._initAttributes()
-        self._number: Attribute[int] = NotSet
-        self._title: Attribute[str] = NotSet
+        super()._initAttributes()
         self._headref_name: Attribute[str] = NotSet
         self._merge_commit: Attribute[CommitGQL] = NotSet
-        self._merged: Attribute[bool] = NotSet
         self._viewer_can_delete_headref: Attribute[bool] = NotSet
         self._commits: Attribute[CommitsHolderGQL] = NotSet
-        self._url: Attribute[str] = NotSet
-
-    @property
-    def number(self) -> int:
-        return self._number.value
-
-    @property
-    def title(self) -> str:
-        return self._title.value
 
     @property
     def headref_name(self) -> str:
@@ -216,17 +222,11 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
     def merge_commit(self) -> CommitGQL | None:
         return self._merge_commit.value
 
-    @property
-    def merged(self) -> bool:
-        return self._merged.value
 
     @property
     def last_commits(self) -> CommitsHolderGQL | None:
         return self._last_commits.value
 
-    @property
-    def url(self) -> str:
-        return self._url.value
 
     @property
     def can_delete_branch(self) -> bool:
@@ -251,11 +251,13 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
         )
 
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
-        if "number" in attributes:
-            self._number = self._makeIntAttribute(attributes["number"])
-
-        if "title" in attributes:
-            self._title = self._makeStringAttribute(attributes["title"])
+        super()._useAttributes(attributes)
+        if "http_url" in attributes:
+            # replace "https://github.com/DTMX/infrastructure/pull/1690"
+            # with 'https://api.github.com/repos/DTMX/infrastructure/pulls/1146'
+            api_url = REPLACE_URL.sub(lambda m: f"https://api.github.com/repos/{m.group(1)}/{m.group(2)}/pulls/{m.group(3)}",
+                attributes["http_url"])
+            super()._useAttributes({"url": api_url})
 
         if "headRefName" in attributes:
             self._headref_name = self._makeStringAttribute(attributes["headRefName"])
@@ -263,17 +265,11 @@ class PullRequestGQL(GraphQlObject, NonCompletableGithubObject):
         if "mergeCommit" in attributes:
             self._merge_commit = self._makeClassAttribute(CommitGQL, attributes["mergeCommit"])
 
-        if "merged" in attributes:
-            self._merged = self._makeBoolAttribute(attributes["merged"])
-
         if "viewerCanDeleteHeadRef" in attributes:
             self._viewer_can_delete_headref = self._makeBoolAttribute(attributes["viewerCanDeleteHeadRef"])
 
         if "last_commits" in attributes:
             self._last_commits = self._makeClassAttribute(CommitsHolderGQL, attributes["last_commits"])
-
-        if "url" in attributes:
-            self._url = self._makeStringAttribute(attributes["url"])
 
 
 def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRequestGQL]:
@@ -317,7 +313,7 @@ def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRe
                                      mergeCommit {
                                          ...inner_commit
                                      }
-                                     commits(last: 1) {
+                                     last_commits: commits(last: 1) {
                                          totalCount
                                          nodes {
                                              commit {
@@ -327,7 +323,10 @@ def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRe
                                      }
                                      merged
                                      viewerCanDeleteHeadRef
-                                     url
+                                     http_url : permalink
+                                     user: author {
+                                         login
+                                     }
                                  }
                              }
                          }
@@ -414,10 +413,10 @@ def __get_github() -> Github:
             pass
 
     if token:
-        gh = Github(auth=github.Auth.Token(token))
+        gh = Github(auth=github.Auth.Token(token), per_page=100)
     else:
-        logger.warning("Warning: no GITHUB_TOKEN found — unauthenticated requests are rate-limited.")
-        gh = Github(per_page=100)
+        logger.warning("no GITHUB_TOKEN found — unauthenticated requests are rate-limited.")
+        gh = Github()
     return gh
 
 
@@ -448,6 +447,7 @@ def __ask_question(question: str) -> bool:
         else:
             print(f"Please enter '{G}y{RESET}' or '{R}n{RESET}'.")
 
+
 def __load_repo(gh: Github, directory: str, repo: str | None) -> Repository:
     if repo is not None:
         try:
@@ -462,6 +462,17 @@ def __load_repo(gh: Github, directory: str, repo: str | None) -> Repository:
         raise Exception(f"Failed to detect repository from git remote: {e}") from e
 
 
+def __delete_branch(pr: PullRequestGQL) -> PullRequestGQL:
+    try:
+        logger.info(pr.head)
+        # pr.delete_branch()
+        # repo.delete_git_ref(f"heads/{pr.headref_name}")
+        logger.info(f"{G}Deleted remote branch for PR #{pr.number:<6}: {pr.headref_name}{RESET}")
+        return pr
+    except Exception as e:
+        logger.warning(f"Failed to delete remote branch for PR #{pr.number}", e)
+
+
 def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
     gh = __get_github()
     try:
@@ -472,7 +483,7 @@ def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
     logger.info(f"Loading data for repository: {Y}{repo.full_name}")
 
     # Fetch closed PRs and filter for merged
-    logger.info("Fetching closed pull requests and filtering merged ones...")
+    logger.debug("Fetching closed pull requests and filtering merged ones...")
     all_prs: List[PullRequestGQL] = []
     can_delete: List[PullRequestGQL] = []
     try:
@@ -483,7 +494,7 @@ def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
             all_prs.append(pr)
             # Required: merged, can delete ref, and merge commit
             try:
-                if pr.merged and pr.viewer_can_delete_head_ref and pr.merge_commit is not None and pr.last_commits is not None and pr.last_commits.total_count > 0:
+                if pr.can_delete_branch:
                     # verify that the merge commit is AFTER the last commit on the branch
                     merge_date = min(pr.merge_commit.authored_date,
                                      pr.merge_commit.committed_date) if pr.merge_commit else None
@@ -491,7 +502,7 @@ def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
                         0].commit.committed_date) if pr.last_commits and pr.last_commits.total_count > 0 else None
                     if merge_date is None or last_commit_date is None:
                         logger.warning(
-                            f"{RESET}Missing dates - Skipping PR {Y}#{pr.number}{R} {B}'{pr.title}{W}: "
+                            f"{RESET}Missing dates - Skipping PR {Y}#{pr.number:<6}{R} {B}'{pr.title}{W}: "
                             f"merge_date={Y}{merge_date}{W}, "
                             f"commit_date={Y}{last_commit_date}{W}.")
                         continue
@@ -499,41 +510,40 @@ def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
                         can_delete.append(pr)
                     else:
                         logger.warning(
-                            f"{RESET}Suspicious commit - Skipping PR {Y}#{pr.number}{R} {B}'{pr.title}{W}: "
+                            f"{RESET}Suspicious commit - Skipping PR {Y}#{pr.number:<6}{R} {B}'{pr.title}{W}: "
                             f"merge commit date {Y}{merge_date}{W} is before last commit date {Y}{last_commit_date}{W}.")
                 else:
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug(
-                            f"Skipping merged PR{W}: {Y}#{pr.number}{W} {B}'{pr.title}{W}': "
+                            f"Skipping merged PR{W}: {Y}#{pr.number:<6}{W} {B}'{pr.title}{W}': "
                             f"merged={Y}{pr.merged}{W}, "
                             f"viewerCanDeleteHeadRef={Y}{pr.viewer_can_delete_head_ref}{W}, "
                             f"mergeCommit={Y}{'present' if pr.merge_commit else 'absent'}{W}, "
                             f"commits_count={Y}{pr.last_commits.total_count if pr.last_commits else 'N/A'}{W}")
             except Exception as e:
                 logger.error(
-                    f"Error processing PR {Y}#{pr.number}{W} {B}'{pr.title}{W}: {e}",
+                    f"Error processing PR {Y}#{pr.number:<6}{W} {B}'{pr.title}{W}: {e}",
                     exc_info=True)
                 continue
     except Exception as e:
         logger.critical(e)
         sys.exit(1)
-
+    can_delete.sort(key=lambda r: r.merge_commit.committed_date)
     logger.info(f"Found {G}{len(can_delete)}{RESET} merged PR(s):")
     list_pr = __ask_question("Would you like to list all the PR's?")
     if list_pr:
         for pr in can_delete:
-            logger.info(f"{RESET}  #{Y}{pr.number}{RESET} {B}'{pr.title}{RESET}' "
+            logger.info(f"{RESET}\t#{Y}{pr.number:<6}{RESET} {B}'{pr.title}'{RESET} "
                         f"on branch {Y}{pr.headref_name}{RESET} "
-                        f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET}")
+                        f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET}"
+                        f"on {Y}{pr.merge_commit.committed_date if pr.merge_commit else 'N/A'}{RESET} ")
 
     delete_pr = __ask_question("Would you like to delete the remote branches for these PR's?")
     if delete_pr:
-        for pr in tqdm(can_delete):
-            try:
-                repo.delete_git_ref(f"heads/{pr.headref_name}")
-                logger.info(f"{G}Deleted remote branch for PR #{pr.number}: {pr.headref_name}{RESET}")
-            except Exception as e:
-                logger.error(f"{R}Failed to delete remote branch for PR #{pr.number}: {pr.headref_name}: {e}{RESET}")
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            #prs_to_delete_ops = {executor.submit(__delete_branch, pr): pr for pr in can_delete}
+            # for pr in tqdm(can_delete):
+            results = list(tqdm(executor.map(__delete_branch, can_delete), total=len(can_delete), desc="Deleting branches"))
 
 
 if __name__ == '__main__':
@@ -573,10 +583,9 @@ if __name__ == '__main__':
     )
 
     if not args.nocache:
-        logger.info("Enabling HTTP caching for GitHub API requests...")
+        logger.debug("Enabling HTTP caching for GitHub API requests...")
         install_cache(
             cache_control=True,
         )
-    # parser.add_argument("--color_main", help="Node name to trace and color path to (default: main)", default="main")
     args = parser.parse_args()
     main(args.repo, args.path)
