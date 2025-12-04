@@ -462,12 +462,12 @@ def __load_repo(gh: Github, directory: str, repo: str | None) -> Repository:
         raise Exception(f"Failed to detect repository from git remote: {e}") from e
 
 
-def __delete_branch(pr: PullRequestGQL) -> PullRequestGQL:
+def __delete_branch(pr: PullRequestGQL, force: bool = False) -> PullRequestGQL:
     try:
         logger.info(pr.head)
-        # pr.delete_branch()
+        pr.delete_branch(force)
         # repo.delete_git_ref(f"heads/{pr.headref_name}")
-        logger.info(f"{G}Deleted remote branch for PR #{pr.number:<6}: {pr.headref_name}{RESET}")
+        logger.info(f"{G}Deleted remote branch for PR {Y}#{pr.number:<6}{RESET}: {B}{pr.headref_name}{RESET}")
         return pr
     except Exception as e:
         logger.warning(f"Failed to delete remote branch for PR #{pr.number}", e)
@@ -535,7 +535,8 @@ def main(repo_name: str | None, path: str, everyone: bool = False) -> None:
         for pr in can_delete:
             logger.info(f"{RESET}\t#{Y}{pr.number:<6}{RESET} {B}'{pr.title}'{RESET} "
                         f"on branch {Y}{pr.headref_name}{RESET} "
-                        f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET}"
+                        f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET} "
+                        f"from {Y}{pr.last_commits.nodes[0].commit.abbreviated_oid}{RESET} "
                         f"on {Y}{pr.merge_commit.committed_date if pr.merge_commit else 'N/A'}{RESET} ")
 
     delete_pr = __ask_question("Would you like to delete the remote branches for these PR's?")
