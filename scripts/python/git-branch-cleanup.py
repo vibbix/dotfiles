@@ -9,6 +9,7 @@
 #   "colorlog~=6.10.1",
 #   "colorama~=0.4.6",
 #   "sourcetypes3~=0.1.0",
+#   "blessed~=1.25.0",
 # ]
 # ///
 """
@@ -34,6 +35,8 @@ import sys
 import argparse
 from typing import Any, List
 
+from blessed import Terminal
+
 from github import Github
 import github
 import git
@@ -49,7 +52,7 @@ from tqdm import tqdm
 
 from sourcetypes import graphql
 
-from colorama import Fore
+from colorama import Fore, Back, Style
 
 R = Fore.RED
 G = Fore.GREEN
@@ -58,10 +61,18 @@ Y = Fore.YELLOW
 W = Fore.WHITE
 RESET = Fore.RESET
 
+R_BG = Back.RED
+Y_BG = Back.YELLOW
+RESET_BG = Back.RESET
+
+R_ALL = Style.RESET_ALL
+
 VERBOSE = False
 VERY_VERBOSE = False
 
 REPLACE_URL = re.compile(r"^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)$")
+
+term : Terminal = Terminal()
 
 from github.GithubObject import (
     Attribute,
@@ -255,9 +266,9 @@ class PullRequestGQL(GraphQlObject, PullRequest):
 
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
         super()._useAttributes(attributes)
-        if "http_url" in attributes:
+        if "html_url" in attributes:
             api_url = REPLACE_URL.sub(lambda m: f"https://api.github.com/repos/{m.group(1)}/{m.group(2)}/pulls/{m.group(3)}",
-                attributes["http_url"])
+                attributes["html_url"])
             super()._useAttributes({"url": api_url})
 
         if "headRefName" in attributes:
@@ -324,7 +335,7 @@ def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRe
                                      }
                                      merged
                                      viewerCanDeleteHeadRef
-                                     http_url : permalink
+                                     html_url : permalink
                                      user: author {
                                          login
                                      }
@@ -433,7 +444,7 @@ def __get_me(gh: Github) -> AuthenticatedUser:
         sys.exit(1)
 
 
-def __ask_question(question: str) -> bool:
+def __ask_question(question: str, default_answer: bool = None) -> bool:
     """
     Asks a yes/no question via input() and returns True for 'yes' and False for 'no'.
     :param question: The question to ask the user.
@@ -441,9 +452,15 @@ def __ask_question(question: str) -> bool:
     :rtype: bool
     """
     print()
+    str_template = f"{Y}{question}{RESET} {Y}[{G}Y{Y}/{R}N{Y}]{RESET}: "
+    if default_answer is not None:
+        if default_answer:
+            print(str_template + f"{G}y{RESET}")
+        else:
+            print(str_template + f"{R}n{RESET}")
+        return default_answer
     while True:
-        answer = input(f"{Y}{question}{RESET} "
-                       f"{Y}[{G}y{Y}/{R}n{Y}]{RESET}: ").strip().lower()
+        answer = input(str_template).strip().lower()
         if answer in ("y", "yes", "Y", "YES"):
             return True
         elif answer in ("n", "no", "N", "NO"):
@@ -473,10 +490,26 @@ def __delete_branch(pr: PullRequestGQL, force: bool = False) -> PullRequestGQL:
         return pr
     except Exception as e:
         logger.warning(f"Failed to delete remote branch for PR #{pr.number}", e)
+    return pr
+
+def log_run(pr: PullRequestGQL) -> None:
+    # pr_link = term.link(pr.html_url, f"{RESET}\t#{Y}{pr.number:<6}{RESET}")
+    # pr_link = term.link(pr.html_url, f"{RESET}\t#{Y}{pr.number:<6}{RESET}")
+    pr_link = f"{RESET}\t#{Y}{term.link(pr.html_url, f"{pr.number:<6}")}{RESET}"
+
+    pr_log = f"{pr_link} {B}'{pr.title}'{RESET} " \
+    f"on branch {Y}{pr.headref_name}{RESET} " \
+    f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET} " \
+    f"from {Y}{pr.last_commits.nodes[0].commit.abbreviated_oid}{RESET} " \
+    f"on {Y}{pr.merge_commit.committed_date if pr.merge_commit else 'N/A'}{RESET}"
+    logger.info(pr_log)
 
 
-
-def run_script(repo_name: str | None, path: str, min_age_days: int = -1, everyone: bool = False):
+def run_script(repo_name: str | None, path: str,
+               min_age_days: int = -1,
+               everyone: bool = False,
+               dryrun: bool = False,
+               default_answer: bool = None) -> None:
     gh = __get_github()
     try:
         repo = __load_repo(gh, path, repo_name)
@@ -484,15 +517,29 @@ def run_script(repo_name: str | None, path: str, min_age_days: int = -1, everyon
         logger.critical(e)
         sys.exit(1)
     logger.info(f"Loading data for repository: {Y}{repo.full_name}")
-    logger.info(f" There are currently {Y}{repo.get_pulls(state='open').totalCount}{RESET} open pull requests.")
-    logger.info(f" There are currently {Y}{repo.get_branches().totalCount}{RESET} branches open.")
-    clean_repo(gh, repo, min_age_days)
+    logger.info(f" There are currently {Y}{repo.get_pulls(state='open').totalCount:>3}{RESET} open pull requests.")
+    logger.info(f" There are currently {Y}{repo.get_branches().totalCount:>3}{RESET} branches open.")
+    # fix for "store_true"
+    default_answer = default_answer if default_answer is True else None
+    clean_repo(gh, repo, min_age_days, dryrun, default_answer)
 
-def clean_repo(gh: Github, repo: Repository, min_age_days: int) -> None:
+def clean_repo(gh: Github,
+               repo: Repository,
+               min_age_days: int,
+               dryrun: bool = False,
+               default_answer: bool = None) -> None:
     """
     Cleans up merged pull requests by deleting their remote branches if possible.
+    :param gh: The GitHub API instance.
+    :type gh: Github
     :param repo: The GitHub repository to clean up.
     :type repo: Repository
+    :param min_age_days: Minimum age in days of merged PRs to consider for branch deletion.
+    :type min_age_days: int
+    :param dryrun: If True, performs a dry run without making changes.
+    :type dryrun: bool
+    :param default_answer: If True, automatically answers 'yes' to all prompts.
+    :type default_answer: bool
     :return: None
     :rtype: None
     """
@@ -530,8 +577,9 @@ def clean_repo(gh: Github, repo: Repository, min_age_days: int) -> None:
                         else:
                             can_delete.append(pr)
                     else:
+                        pr_link = f"{RESET}\t#{Y}{term.link(pr.html_url, f"{pr.number}")}{RESET}"
                         logger.warning(
-                            f"{RESET}Suspicious commit - Skipping PR {Y}#{pr.number:<6}{R} {B}'{pr.title}{W}: "
+                            f"{RESET}Suspicious commit - Skipping PR {pr_link}{R} {B}'{pr.title}{W}: "
                             f"merge commit date {Y}{merge_date}{W} is before last commit date {Y}{last_commit_date}{W}.")
                 else:
                     if VERY_VERBOSE:
@@ -554,16 +602,17 @@ def clean_repo(gh: Github, repo: Repository, min_age_days: int) -> None:
         logger.info(f"{G}No merged PRs found that can be deleted.{RESET}")
         return
     logger.info(f"Found {G}{len(can_delete)}{RESET} applicable merged PR(s):")
-    list_pr = VERY_VERBOSE or __ask_question("Would you like to list all the PR's?")
+    list_pr = dryrun or VERY_VERBOSE or __ask_question("Would you like to list all the PR's?", default_answer)
     if list_pr:
         for pr in can_delete:
-            logger.info(f"{RESET}\t#{Y}{pr.number:<6}{RESET} {B}'{pr.title}'{RESET} "
-                        f"on branch {Y}{pr.headref_name}{RESET} "
-                        f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET} "
-                        f"from {Y}{pr.last_commits.nodes[0].commit.abbreviated_oid}{RESET} "
-                        f"on {Y}{pr.merge_commit.committed_date if pr.merge_commit else 'N/A'}{RESET} ")
-    delete_pr = __ask_question("Would you like to delete the remote branches for these PR's?")
-    if delete_pr:
+            log_run(pr)
+            # logger.info(f"{RESET}\t#{Y}{pr.number:<6}{RESET} {B}'{pr.title}'{RESET} "
+            #             f"on branch {Y}{pr.headref_name}{RESET} "
+            #             f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET} "
+            #             f"from {Y}{pr.last_commits.nodes[0].commit.abbreviated_oid}{RESET} "
+            #             f"on {Y}{pr.merge_commit.committed_date if pr.merge_commit else 'N/A'}{RESET} ")
+    delete_pr = __ask_question("Would you like to delete the remote branches for these PR's?", default_answer)
+    if delete_pr and not dryrun:
         with ThreadPoolExecutor(max_workers=8) as executor:
             #prs_to_delete_ops = {executor.submit(__delete_branch, pr): pr for pr in can_delete}
             # for pr in tqdm(can_delete):
@@ -576,7 +625,8 @@ if __name__ == '__main__':
         "repo",
         nargs="?",
         default=None,
-        help="the repository in the format 'owner/repo' (default: detected from git remote origin)",
+        help="the repository in the format 'owner/repo' (default: detected from git remote origin).\n"
+             "If none provided, the script will attempt to auto-detect the repository from the git remote."
     )
     parser.add_argument(
         "--path",
@@ -591,7 +641,7 @@ if __name__ == '__main__':
         help='Increase verbosity level'
     )
     parser.add_argument(
-        "-f", "--force",
+        "--force", "-f",
         action="store_true",
         help="Forces update check even if not needed",
     )
@@ -601,7 +651,7 @@ if __name__ == '__main__':
         help="Disable HTTP caching for GitHub API requests",
     )
     parser.add_argument(
-        "-y", "--yes",
+        "--yes", "-y",
         action="store_true",
         help="Response with yes to everything",
     )
@@ -610,6 +660,11 @@ if __name__ == '__main__':
         type=int,
         default=-1,
         help="Minimum age in days of the merged PRs to consider for branch deletion",
+    )
+    parser.add_argument(
+        "--dryrun",
+        action="store_true",
+        help="Perform a trial run with no changes made",
     )
 
     args = parser.parse_args()
@@ -629,4 +684,4 @@ if __name__ == '__main__':
             cache_control=True,
         )
     args = parser.parse_args()
-    run_script(args.repo, args.path, args.min_age_days)
+    run_script(args.repo, args.path, args.min_age_days, dryrun=args.dryrun, default_answer=args.yes)
