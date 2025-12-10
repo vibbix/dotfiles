@@ -54,12 +54,14 @@ from sourcetypes import graphql
 
 from colorama import Fore, Back, Style
 
-R = Fore.RED
-G = Fore.GREEN
-B = Fore.BLUE
-Y = Fore.YELLOW
-W = Fore.WHITE
-RESET = Fore.RESET
+term : Terminal = Terminal()
+
+R = term.red
+G = term.green
+B = term.blue
+Y = term.yellow
+W = term.white
+RESET = term.normal
 
 R_BG = Back.RED
 Y_BG = Back.YELLOW
@@ -72,7 +74,6 @@ VERY_VERBOSE = False
 
 REPLACE_URL = re.compile(r"^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)$")
 
-term : Terminal = Terminal()
 
 from github.GithubObject import (
     Attribute,
@@ -236,11 +237,9 @@ class PullRequestGQL(GraphQlObject, PullRequest):
     def merge_commit(self) -> CommitGQL | None:
         return self._merge_commit.value
 
-
     @property
     def last_commits(self) -> CommitsHolderGQL | None:
         return self._last_commits.value
-
 
     @property
     def can_delete_branch(self) -> bool:
@@ -282,6 +281,48 @@ class PullRequestGQL(GraphQlObject, PullRequest):
 
         if "last_commits" in attributes:
             self._last_commits = self._makeClassAttribute(CommitsHolderGQL, attributes["last_commits"])
+
+
+def __check_if_branch_pr_safe_to_delete(pr: PullRequestGQL, minimum_age: int | None = None) -> bool:
+    if not pr.viewer_can_delete_head_ref:
+        return False
+
+    if pr.merged:
+        # verify that the merge commit is AFTER the last commit on the branch
+        merge_date = min(pr.merge_commit.authored_date,
+                         pr.merge_commit.committed_date) if pr.merge_commit else None
+        last_commit_date = max(pr.last_commits.nodes[0].commit.authored_date, pr.last_commits.nodes[
+            0].commit.committed_date) if pr.last_commits and pr.last_commits.total_count > 0 else None
+        if merge_date is None or last_commit_date is None:
+            logger.warning(
+                f"{RESET}Missing dates - Skipping PR {Y}#{pr.number:<6}{R} {B}'{pr.title}{W}: "
+                f"merge_date={Y}{merge_date}{W}, "
+                f"commit_date={Y}{last_commit_date}{W}.")
+            return False
+        if merge_date >= last_commit_date:
+            if minimum_age and minimum_age > 0:
+                if merge_date <= datetime.now(tz=timezone.utc) - timedelta(days=minimum_age):
+                    return True
+                else:
+                    if VERBOSE:
+                        logger.debug(
+                            f"{RESET}Skipping PR {Y}#{pr.number:<6}{W} {B}'{pr.title}{W} because it is not older than {Y}{minimum_age}{W} days ")
+            else:
+                return True
+        else:
+            pr_link = f"{RESET}\t#{Y}{term.link(pr.html_url, f"{pr.number}")}{RESET}"
+            logger.warning(
+                f"{RESET}Suspicious commit - Skipping PR {pr_link}{R} {B}'{pr.title}{W}: "
+                f"merge commit date {Y}{merge_date}{W} is before last commit date {Y}{last_commit_date}{W}.")
+    else:
+        if VERY_VERBOSE:
+            logger.info(
+                f"Skipping merged PR{W}: {Y}#{pr.number:<6}{W} {B}'{pr.title}{W}': "
+                f"merged={Y}{pr.merged}{W}, "
+                f"viewerCanDeleteHeadRef={Y}{pr.viewer_can_delete_head_ref}{W}, "
+                f"mergeCommit={Y}{'present' if pr.merge_commit else 'absent'}{W}, "
+                f"commits_count={Y}{pr.last_commits.total_count if pr.last_commits else 'N/A'}{W}")
+    return False
 
 
 def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRequestGQL]:
@@ -517,7 +558,9 @@ def run_script(repo_name: str | None, path: str,
         logger.critical(e)
         sys.exit(1)
     logger.info(f"Loading data for repository: {Y}{repo.full_name}")
-    logger.info(f" There are currently {Y}{repo.get_pulls(state='open').totalCount:>3}{RESET} open pull requests.")
+    open_prs = term.link(repo.html_url + "/pulls?q=is%3Apr+is%3Aopen", f"{repo.get_pulls(state='open').totalCount:>3}")
+
+    logger.info(f" There are currently {Y}{open_prs}{RESET} open pull requests.")
     logger.info(f" There are currently {Y}{repo.get_branches().totalCount:>3}{RESET} branches open.")
     # fix for "store_true"
     default_answer = default_answer if default_answer is True else None
