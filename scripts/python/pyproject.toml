@@ -15,4 +15,9 @@ dependencies = [
     "colorama~=0.4.6",
     "sourcetypes3~=0.1.0",
     "blessed~=1.25.0",
+    # Markdown parsing libraries
+    # "mistletoe~=1.5.1",
+    "beautifulsoup4~=4.14.3",
+    "pasteboard~=0.4.0; sys_platform == 'darwin'",
+    "mdutils~=1.8.1",
 ]

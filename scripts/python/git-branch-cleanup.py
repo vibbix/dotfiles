@@ -49,6 +49,7 @@ from github.Repository import Repository
 
 from requests_cache import install_cache
 from tqdm import tqdm
+from tqdm.contrib.concurrent import thread_map
 
 from sourcetypes import graphql
 
@@ -207,7 +208,9 @@ class CommitsHolderGQL(GraphQlObject, NonCompletableGithubObject):
 class PullRequestGQL(GraphQlObject, PullRequest):
     """
     Represents a GitHub Pull Request with additional GraphQL attributes.
+    
     Extends the standard PullRequest class from PyGithub.
+    
     Attributes:
         headref_name (str): The name of the head reference (branch) for the pull
         request.
@@ -282,15 +285,23 @@ class PullRequestGQL(GraphQlObject, PullRequest):
         if "last_commits" in attributes:
             self._last_commits = self._makeClassAttribute(CommitsHolderGQL, attributes["last_commits"])
 
-
-def __check_if_branch_pr_safe_to_delete(pr: PullRequestGQL, minimum_age: int | None = None) -> bool:
+def __check_if_branch_pr_safe_to_delete(pr: PullRequestGQL, minimum_age: int | timedelta | None = None) -> bool:
+    """
+    Docstring for __check_if_branch_pr_safe_to_delete
+    
+    :param pr: The pull request to check
+    :type pr: PullRequestGQL
+    :param minimum_age: The minimum age (as a time delta, or in days from now) for the pull request to be considered safe to delete
+    :type minimum_age: int | None
+    :return: True if the branch is safe to delete, False otherwise
+    :rtype: bool
+    """
     if not pr.viewer_can_delete_head_ref:
         return False
 
     if pr.merged:
         # verify that the merge commit is AFTER the last commit on the branch
-        merge_date = min(pr.merge_commit.authored_date,
-                         pr.merge_commit.committed_date) if pr.merge_commit else None
+        merge_date = min(pr.merge_commit.authored_date, pr.merge_commit.committed_date) if pr.merge_commit else None
         last_commit_date = max(pr.last_commits.nodes[0].commit.authored_date, pr.last_commits.nodes[
             0].commit.committed_date) if pr.last_commits and pr.last_commits.total_count > 0 else None
         if merge_date is None or last_commit_date is None:
@@ -300,8 +311,9 @@ def __check_if_branch_pr_safe_to_delete(pr: PullRequestGQL, minimum_age: int | N
                 f"commit_date={Y}{last_commit_date}{W}.")
             return False
         if merge_date >= last_commit_date:
-            if minimum_age and minimum_age > 0:
-                if merge_date <= datetime.now(tz=timezone.utc) - timedelta(days=minimum_age):
+            if minimum_age:
+                delta: timedelta = timedelta(days=minimum_age) if isinstance(minimum_age, int) else minimum_age
+                if merge_date <= datetime.now(tz=timezone.utc) - delta:
                     return True
                 else:
                     if VERBOSE:
@@ -527,7 +539,8 @@ def __load_repo(gh: Github, directory: str, repo: str | None) -> Repository:
 def __delete_branch(pr: PullRequestGQL, force: bool = False) -> PullRequestGQL:
     try:
         pr.delete_branch(force)
-        logger.info(f"{G}Deleted remote branch for PR {Y}#{pr.number:<6}{RESET}: {B}{pr.headref_name}{RESET}")
+        if VERBOSE:
+            logger.info(f"{G}Deleted remote branch for PR {Y}#{pr.number:<6}{RESET}: {B}{pr.headref_name}{RESET}")
         return pr
     except Exception as e:
         logger.warning(f"Failed to delete remote branch for PR #{pr.number}", e)
@@ -562,13 +575,18 @@ def run_script(repo_name: str | None, path: str,
 
     logger.info(f" There are currently {Y}{open_prs}{RESET} open pull requests.")
     logger.info(f" There are currently {Y}{repo.get_branches().totalCount:>3}{RESET} branches open.")
+
+    if repo.archived:
+        logger.warning(f"{R_BG}The repository {Y}{repo.full_name}{R_BG} is archived. Exiting.{RESET_BG}")
+        sys.exit(0)
+    
     # fix for "store_true"
     default_answer = default_answer if default_answer is True else None
     clean_repo(gh, repo, min_age_days, dryrun, default_answer)
 
 def clean_repo(gh: Github,
                repo: Repository,
-               min_age_days: int,
+               min_age_days: int = -1,
                dryrun: bool = False,
                default_answer: bool = None) -> None:
     """
@@ -598,45 +616,12 @@ def clean_repo(gh: Github,
             all_prs.append(pr)
             # Required: merged, can delete ref, and merge commit
             try:
-                if pr.can_delete_branch:
-                    # verify that the merge commit is AFTER the last commit on the branch
-                    merge_date = min(pr.merge_commit.authored_date,
-                                     pr.merge_commit.committed_date) if pr.merge_commit else None
-                    last_commit_date = max(pr.last_commits.nodes[0].commit.authored_date, pr.last_commits.nodes[
-                        0].commit.committed_date) if pr.last_commits and pr.last_commits.total_count > 0 else None
-                    if merge_date is None or last_commit_date is None:
-                        logger.warning(
-                            f"{RESET}Missing dates - Skipping PR {Y}#{pr.number:<6}{R} {B}'{pr.title}{W}: "
-                            f"merge_date={Y}{merge_date}{W}, "
-                            f"commit_date={Y}{last_commit_date}{W}.")
-                        continue
-                    if merge_date >= last_commit_date:
-                        if min_age_days > 0:
-                            if merge_date <= datetime.now(tz=timezone.utc) - timedelta(days=min_age_days):
-                                can_delete.append(pr)
-                            else:
-                                if VERBOSE:
-                                    logger.debug(f"{RESET}Skipping PR {Y}#{pr.number:<6}{W} {B}'{pr.title}{W} because it is not older than {Y}{min_age_days}{W} days ")
-                        else:
-                            can_delete.append(pr)
-                    else:
-                        pr_link = f"{RESET}\t#{Y}{term.link(pr.html_url, f"{pr.number}")}{RESET}"
-                        logger.warning(
-                            f"{RESET}Suspicious commit - Skipping PR {pr_link}{R} {B}'{pr.title}{W}: "
-                            f"merge commit date {Y}{merge_date}{W} is before last commit date {Y}{last_commit_date}{W}.")
-                else:
-                    if VERY_VERBOSE:
-                        logger.info(
-                            f"Skipping merged PR{W}: {Y}#{pr.number:<6}{W} {B}'{pr.title}{W}': "
-                            f"merged={Y}{pr.merged}{W}, "
-                            f"viewerCanDeleteHeadRef={Y}{pr.viewer_can_delete_head_ref}{W}, "
-                            f"mergeCommit={Y}{'present' if pr.merge_commit else 'absent'}{W}, "
-                            f"commits_count={Y}{pr.last_commits.total_count if pr.last_commits else 'N/A'}{W}")
+                #if pr.can_delete_branch:
+                if __check_if_branch_pr_safe_to_delete(pr, min_age_days):
+                    can_delete.append(pr)
             except Exception as e:
                 logger.error(
-                    f"Error processing PR {Y}#{pr.number:<6}{W} {B}'{pr.title}{W}: {e}",
-                    exc_info=True)
-                continue
+                    f"Error processing PR {Y}#{pr.number:<6}{W} {B}'{pr.title}{W}: {e}", exc_info=True)
     except Exception as e:
         logger.critical(e)
         sys.exit(1)
@@ -656,10 +641,7 @@ def clean_repo(gh: Github,
             #             f"on {Y}{pr.merge_commit.committed_date if pr.merge_commit else 'N/A'}{RESET} ")
     delete_pr = __ask_question("Would you like to delete the remote branches for these PR's?", default_answer)
     if delete_pr and not dryrun:
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            #prs_to_delete_ops = {executor.submit(__delete_branch, pr): pr for pr in can_delete}
-            # for pr in tqdm(can_delete):
-            results = list(tqdm(executor.map(__delete_branch, can_delete), total=len(can_delete), desc="Deleting branches"))
+        results = thread_map(__delete_branch, can_delete, max_workers=8, desc="Deleting branches", unit="branches")
 
 
 if __name__ == '__main__':
@@ -705,7 +687,7 @@ if __name__ == '__main__':
         help="Minimum age in days of the merged PRs to consider for branch deletion",
     )
     parser.add_argument(
-        "--dryrun",
+        "--dryrun", "--dry-run", "-d",
         action="store_true",
         help="Perform a trial run with no changes made",
     )
@@ -726,5 +708,4 @@ if __name__ == '__main__':
         install_cache(
             cache_control=True,
         )
-    args = parser.parse_args()
     run_script(args.repo, args.path, args.min_age_days, dryrun=args.dryrun, default_answer=args.yes)

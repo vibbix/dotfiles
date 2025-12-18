@@ -21,6 +21,19 @@ wheels = [
 ]
 
 [[package]]
+name = "beautifulsoup4"
+version = "4.14.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "soupsieve" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c3/b0/1c6a16426d389813b48d95e26898aff79abbde42ad353958ad95cc8c9b21/beautifulsoup4-4.14.3.tar.gz", hash = "sha256:6292b1c5186d356bba669ef9f7f051757099565ad9ada5dd630bd9de5fa7fb86", size = 627737, upload-time = "2025-11-30T15:08:26.084Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/39/47f9197bdd44df24d67ac8893641e16f386c984a0619ef2ee4c51fbbc019/beautifulsoup4-4.14.3-py3-none-any.whl", hash = "sha256:0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb", size = 107721, upload-time = "2025-11-30T15:08:24.087Z" },
+]
+
+[[package]]
 name = "blessed"
 version = "1.25.0"
 source = { registry = "https://pypi.org/simple" }
@@ -313,6 +326,33 @@ wheels = [
 ]
 
 [[package]]
+name = "mdutils"
+version = "1.8.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/44/73810a6af37f57ec00f6e480bbb0f24ea1e25e85923025eb8ddabc54fe68/mdutils-1.8.1.tar.gz", hash = "sha256:cdce6bde79822a7fea3c8fd6426cea0acfadd0f94ee3d3ebfa09aa38b561af35", size = 24077, upload-time = "2025-10-18T15:30:14.546Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/06/38/f2eeaa5d1c13e64a4dc18b5c6e28b9d5f8b20f5450ba8c3a694e4a78893d/mdutils-1.8.1-py3-none-any.whl", hash = "sha256:3d62d0a4d19fcd68d1daf956d1832f4a598663c73022bd95b09fae69c994b5ac", size = 21656, upload-time = "2025-10-18T15:30:13.129Z" },
+]
+
+[[package]]
+name = "mistletoe"
+version = "1.5.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/31/ae/d33647e2a26a8899224f36afc5e7b7a670af30f1fd87231e9f07ca19d673/mistletoe-1.5.1.tar.gz", hash = "sha256:c5571ce6ca9cfdc7ce9151c3ae79acb418e067812000907616427197648030a3", size = 111769, upload-time = "2025-12-07T16:19:01.066Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/20/60/0980fefdc4d12c18c1bbab9d62852f27aded8839233c7b0a9827aaf395f5/mistletoe-1.5.1-py3-none-any.whl", hash = "sha256:d3e97664798261503f685f6a6281b092628367cf3128fc68a015a993b0c4feb3", size = 55331, upload-time = "2025-12-07T16:18:59.65Z" },
+]
+
+[[package]]
+name = "pasteboard"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/be/ed/d21829c72b2d7de85a3ef8214639e60611e92676c5559a4e879c5711b3ac/pasteboard-0.4.0.tar.gz", hash = "sha256:dd332253c431ada32074dd5693a231261f2bbd78465de4da27a3469f30d0f84d", size = 28213, upload-time = "2024-01-15T01:54:46.618Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/59/c1/f488fbf6e0ab046d208155bccfa8d0bda737c66ce531bc64015238e38f02/pasteboard-0.4.0-cp312-cp312-macosx_11_0_universal2.whl", hash = "sha256:d7e749dafc1fe75fe7dde3464e81059b1735f3de67c0edc035e5fcef3410afb8", size = 30657, upload-time = "2024-01-15T01:54:42.688Z" },
+]
+
+[[package]]
 name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -482,6 +522,15 @@ wheels = [
 ]
 
 [[package]]
+name = "soupsieve"
+version = "2.8"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6d/e6/21ccce3262dd4889aa3332e5a119a3491a95e8f60939870a3a035aabac0d/soupsieve-2.8.tar.gz", hash = "sha256:e2dd4a40a628cb5f28f6d4b0db8800b8f581b65bb380b97de22ba5ca8d72572f", size = 103472, upload-time = "2025-08-27T15:39:51.78Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/a0/bb38d3b76b8cae341dad93a2dd83ab7462e6dbcdd84d43f54ee60a8dc167/soupsieve-2.8-py3-none-any.whl", hash = "sha256:0cc76456a30e20f5d7f2e14a98a4ae2ee4e5abdc7c5ea0aafe795f344bc7984c", size = 36679, upload-time = "2025-08-27T15:39:50.179Z" },
+]
+
+[[package]]
 name = "sourcetypes3"
 version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -540,10 +589,14 @@ name = "vibbix-scripts"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "beautifulsoup4" },
     { name = "blessed" },
     { name = "colorama" },
     { name = "colorlog" },
     { name = "gitpython" },
+    { name = "mdutils" },
+    { name = "mistletoe" },
+    { name = "pasteboard", marker = "sys_platform == 'darwin'" },
     { name = "pexpect" },
     { name = "pygithub" },
     { name = "requests-cache" },
@@ -554,10 +607,14 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "beautifulsoup4", specifier = "~=4.14.3" },
     { name = "blessed", specifier = "~=1.25.0" },
     { name = "colorama", specifier = "~=0.4.6" },
     { name = "colorlog", specifier = "~=6.10.1" },
     { name = "gitpython", specifier = "~=3.1.45" },
+    { name = "mdutils", specifier = "~=1.8.1" },
+    { name = "mistletoe", specifier = "~=1.5.1" },
+    { name = "pasteboard", marker = "sys_platform == 'darwin'", specifier = "~=0.4.0" },
     { name = "pexpect", specifier = ">=4.9.0" },
     { name = "pygithub", specifier = "~=2.8.1" },
     { name = "requests-cache", specifier = "~=1.2.1" },
