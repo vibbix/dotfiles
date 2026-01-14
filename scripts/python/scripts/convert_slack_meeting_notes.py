@@ -47,7 +47,7 @@ def __load_html_from_pasteboard() -> str:
         raise RuntimeError("No HTML content in pasteboard")
     return html_content
 
-def __parse_html_from_slack(html_source: str) -> List[SlackEvent]:
+def parse_html_from_slack(html_source: str) -> List[SlackEvent]:
     soup = BeautifulSoup(html_source, "html.parser")
     items = soup.select("div[data-qa='virtual-list-item']")
     events: List[SlackEvent] = []
@@ -95,27 +95,25 @@ def __create_chat_tuple(event: SlackEvent) -> tuple[str, str, str]:
     return event.avatar_url, event.username, italics + event.event_text + italics
 
 def __run_script(verbose: bool = False, paste: bool = False) -> None:
-    html_source = __load_html_from_pasteboard()
-    events = __parse_html_from_slack(html_source)
-    rows = [__create_chat_tuple(ev) for ev in events if ev.event_text.strip()]
-    #         >>> from mdutils.tools.Table import Table
-    #         >>> text_list = ['List of Items', 'Description', 'Result', 'Item 1', 'Description of item 1', '10', 'Item 2', 'Description of item 2', '0']
-    #         >>> table = Table().create_table(columns=3, rows=3, text=text_list, text_align='center')
-    #         >>> print(repr(table))
-    # md = mdutils.MdUtils(file_name="slack_meeting_notes")
-    # md.new_line(HEADER)
-    cells = ["avatar", "user", "text"]
-    for avatar, user, text in rows:
-        avatar_cell = f"![]({avatar})" if avatar else ""
-        cells.extend([avatar_cell, user, text])
-    table = Table().create_table(columns=3, rows=len(rows) + 1, text=cells, text_align="left")
-    output = f"{HEADER}\n{table}{FOOTER}\n"
+    html_source: str = __load_html_from_pasteboard()
+    events : List[SlackEvent] = parse_html_from_slack(html_source)
+    output = render_markdown_from_events(events)
     if paste and PASTEBOARD_AVAILABLE:
         pb = pasteboard.Pasteboard()
         pb.set_contents(output, type=pasteboard.String)
         logger.info("Output pasted to clipboard.")
     else:
         print(output)
+
+def render_markdown_from_events(events: List[SlackEvent]) -> str:
+    rows = [__create_chat_tuple(ev) for ev in events if ev.event_text.strip()]
+    cells = ["avatar", "user", "text"]
+    for avatar, user, text in rows:
+        avatar_cell = f"![]({avatar})" if avatar else ""
+        cells.extend([avatar_cell, user, text])
+    table = Table().create_table(columns=3, rows=len(rows) + 1, text=cells, text_align="left")
+    output = f"{HEADER}\n{table}{FOOTER}\n"
+    return output
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Convert Slack Meeting Notes to Markdown format")

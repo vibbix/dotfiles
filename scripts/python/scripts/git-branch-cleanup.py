@@ -25,11 +25,9 @@ Usage:
 The script detects the repo owner/name from `git remote get-url origin`.
 It prints each merged PR number, title, branch, and commit SHA.
 """
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import logging
 import os
-import re
 import subprocess
 import sys
 import argparse
@@ -55,7 +53,7 @@ from sourcetypes import graphql
 
 from colorama import Fore, Back, Style
 
-term : Terminal = Terminal()
+term: Terminal = Terminal()
 
 R = term.red
 G = term.green
@@ -75,12 +73,11 @@ VERY_VERBOSE = False
 
 REPLACE_URL = re.compile(r"^https://github\.com/([^/]+)/([^/]+)/pull/(\d+)$")
 
-
 from github.GithubObject import (
     Attribute,
     GraphQlObject,
     NotSet,
-    NonCompletableGithubObject
+    NonCompletableGithubObject, CompletableGithubObject
 )
 from github.PaginatedList import PaginatedList
 
@@ -101,6 +98,119 @@ logger.addHandler(error_handler)
 logger.addHandler(log_handler)
 logger.propagate = False
 
+# language=graphql
+FRAGMENT_INNER_COMMIT: graphql = """
+                                 fragment inner_commit on Commit {
+                                     abbreviatedOid
+                                     id
+                                     oid
+                                     committedDate
+                                     authoredDate
+                                 }"""
+# language=graphql
+FRAGMENT_GET_PULL_REQUESTS: graphql = """
+                                      fragment pull_req_fragment on PullRequest {
+                                          totalCount
+                                          pageInfo {
+                                              startCursor
+                                              endCursor
+                                              hasNextPage
+                                              hasPreviousPage
+                                          }
+                                          nodes {
+                                              number
+                                              title
+                                              headRefName
+                                              mergeCommit {
+                                                  ...inner_commit
+                                              }
+                                              last_commits: commits(last: 1) {
+                                                  totalCount
+                                                  nodes {
+                                                      commit {
+                                                          ...inner_commit
+                                                      }
+                                                  }
+                                              }
+                                              merged
+                                              viewerCanDeleteHeadRef
+                                              html_url : permalink
+                                              user: author {
+                                                  login
+                                              }
+                                          }
+                                      }"""
+
+
+class CommitAttachedPR(NonCompletableGithubObject):
+    def _initAttributes(self) -> None:
+        self._pr_number: Attribute[int] = NotSet
+        self._repo_name: Attribute[str] = NotSet
+        self._repo_owner: Attribute[str] = NotSet
+
+    @property
+    def pr_number(self) -> int:
+        return self._pr_number.value
+
+    @property
+    def repo_name(self) -> str:
+        return self._repo_name.value
+
+    @property
+    def repo_owner(self) -> str:
+        return self._repo_owner.value
+
+    def _useAttributes(self, attributes: dict[str, Any]) -> None:
+        # super class is a REST API GithubObject, attributes are coming from GraphQL
+        # super()._useAttributes(as_rest_api_attributes(attributes))
+        if "number" in attributes:
+            self._abbreviated_oid = self._makeStringAttribute(attributes["abbreviatedOid"])
+        if "repo" in attributes:
+            if "name" in attributes["repo"]:
+                self._repo_name = self._makeStringAttribute(attributes["repo"]["name"])
+            if "ownerLogin" in attributes["repo"]:
+                self._repo_owner = self._makeStringAttribute(attributes["repo"]["ownerLogin"])
+
+
+class CommitBranchesHolder(NonCompletableGithubObject):
+    def _initAttributes(self) -> None:
+        self._branch: Attribute[str] = NotSet
+        self._prs: Attribute[List[CommitAttachedPR]] = NotSet
+
+    @property
+    def branch(self) -> str:
+        return self._branch.value
+
+    @property
+    def prs(self) -> List[CommitAttachedPR]:
+        return self._prs.value
+
+    def _useAttributes(self, attributes: dict[str, Any]) -> None:
+        if "branch" in attributes:
+            self._branch = self._makeStringAttribute(attributes["branch"])
+        if "prs" in attributes:
+            self._prs = self._makeListOfClassesAttribute(CommitAttachedPR, attributes["prs"])
+
+
+class BranchCommits(NonCompletableGithubObject):
+    def _initAttributes(self) -> None:
+        self._branches: Attribute[List[CommitBranchesHolder]] = NotSet
+        self._tags: Attribute[List[str]] = NotSet
+
+    @property
+    def branches(self) -> List[CommitBranchesHolder]:
+        return self._branches.value
+
+    @property
+    def tags(self) -> List[str]:
+        return self._tags.value
+
+    def _useAttributes(self, attributes: dict[str, Any]) -> None:
+        if "branches" in attributes:
+            self._branches = self._makeListOfClassesAttribute(CommitBranchesHolder, attributes["branches"])
+        if "tags" in attributes:
+            self._tags = self._makeListOfStringsAttribute(attributes["tags"])
+
 
 class CommitGQL(GraphQlObject, NonCompletableGithubObject):
     """
@@ -120,6 +230,7 @@ class CommitGQL(GraphQlObject, NonCompletableGithubObject):
         self._oid: Attribute[str] = NotSet
         self._committed_date: Attribute[datetime] = NotSet
         self._authored_date: Attribute[datetime] = NotSet
+        self._branch_commits: Attribute[BranchCommits] = NotSet
 
     @property
     def abbreviated_oid(self) -> str:
@@ -140,7 +251,7 @@ class CommitGQL(GraphQlObject, NonCompletableGithubObject):
         for example when rebasing the branch where the commit is in on another branch.
         
         :param self: Description
-        :return: Description
+        :return: the commit date
         :rtype: datetime
         """
         return self._committed_date.value
@@ -152,10 +263,20 @@ class CommitGQL(GraphQlObject, NonCompletableGithubObject):
         According to the docs of git commit, the author date could be overridden using the --date switch.
 
         :param self: Description
-        :return: Description
+        :return: the authored date
         :rtype: datetime
         """
         return self._authored_date.value
+
+    @property
+    def branch_commits(self) -> BranchCommits:
+        """
+        The branches and tags that contain this commit.
+
+        :return: Branches and tags containing this commit
+        :rtype: BranchCommits
+        """
+        return self._branch_commits.value
 
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
         # super class is a REST API GithubObject, attributes are coming from GraphQL
@@ -170,6 +291,7 @@ class CommitGQL(GraphQlObject, NonCompletableGithubObject):
             self._committed_date = self._makeDatetimeAttribute(attributes["committedDate"])
         if "authoredDate" in attributes:
             self._authored_date = self._makeDatetimeAttribute(attributes["authoredDate"])
+        self._branch_commits = self._makeClassAttribute(BranchCommits, {id: self._id.value})
 
 
 class PullRequestCommit(GraphQlObject, NonCompletableGithubObject):
@@ -183,7 +305,6 @@ class PullRequestCommit(GraphQlObject, NonCompletableGithubObject):
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
         if "commit" in attributes:
             self._commit = self._makeClassAttribute(CommitGQL, attributes["commit"])
-
 
 class CommitsHolderGQL(GraphQlObject, NonCompletableGithubObject):
     def _initAttributes(self) -> None:
@@ -204,7 +325,6 @@ class CommitsHolderGQL(GraphQlObject, NonCompletableGithubObject):
         if "nodes" in attributes:
             self._nodes = self._makeListOfClassesAttribute(PullRequestCommit, attributes["nodes"])
 
-
 class PullRequestGQL(GraphQlObject, PullRequest):
     """
     Represents a GitHub Pull Request with additional GraphQL attributes.
@@ -221,6 +341,7 @@ class PullRequestGQL(GraphQlObject, PullRequest):
         last_commits (CommitsHolderGQL | None): The last commits associated with
         the pull request.
     """
+
     def _initAttributes(self) -> None:
         super()._initAttributes()
         self._headref_name: Attribute[str] = NotSet
@@ -269,7 +390,8 @@ class PullRequestGQL(GraphQlObject, PullRequest):
     def _useAttributes(self, attributes: dict[str, Any]) -> None:
         super()._useAttributes(attributes)
         if "html_url" in attributes:
-            api_url = REPLACE_URL.sub(lambda m: f"https://api.github.com/repos/{m.group(1)}/{m.group(2)}/pulls/{m.group(3)}",
+            api_url = REPLACE_URL.sub(
+                lambda m: f"https://api.github.com/repos/{m.group(1)}/{m.group(2)}/pulls/{m.group(3)}",
                 attributes["html_url"])
             super()._useAttributes({"url": api_url})
 
@@ -284,6 +406,18 @@ class PullRequestGQL(GraphQlObject, PullRequest):
 
         if "last_commits" in attributes:
             self._last_commits = self._makeClassAttribute(CommitsHolderGQL, attributes["last_commits"])
+
+class RepositoryBranchGQL(GraphQlObject, NonCompletableGithubObject):
+    def _initAttributes(self) -> None:
+        super()._initAttributes()
+        # self._headref_name: Attribute[str] = NotSet
+        # self._merge_commit: Attribute[CommitGQL] = NotSet
+        # self._viewer_can_delete_headref: Attribute[bool] = NotSet
+        # self._commits: Attribute[CommitsHolderGQL] = NotSet
+
+    def _useAttributes(self, attributes: dict[str, Any]) -> None:
+        pass
+
 
 def __check_if_branch_pr_safe_to_delete(pr: PullRequestGQL, minimum_age: int | timedelta | None = None) -> bool:
     """
@@ -338,15 +472,8 @@ def __check_if_branch_pr_safe_to_delete(pr: PullRequestGQL, minimum_age: int | t
 
 
 def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRequestGQL]:
-    query: graphql = """
-                     fragment inner_commit on Commit {
-                         abbreviatedOid
-                         id
-                         oid
-                         committedDate
-                         authoredDate
-                     }
-
+    query: graphql = f"""
+                    {FRAGMENT_INNER_COMMIT}
                      query Q(
                          $repo: String!
                          $owner: String!
@@ -354,49 +481,48 @@ def __get_pull_request_gql(gh: github.Github, repo: str) -> PaginatedList[PullRe
                          $last: Int
                          $before: String
                          $after: String
-                     ) {
-                         repository(name: $repo, owner: $owner) {
+                     ) {{
+                         repository(name: $repo, owner: $owner) {{
                              pullRequests(
                                  first: $first
                                  last: $last
                                  before: $before
                                  after: $after
-                                 orderBy: { direction: DESC, field: UPDATED_AT }
+                                 orderBy: {{ direction: DESC, field: UPDATED_AT }}
                                  states: [CLOSED, MERGED]
-                             ) {
+                             ) {{
                                  totalCount
-                                 pageInfo {
+                                 pageInfo {{
                                      startCursor
                                      endCursor
                                      hasNextPage
                                      hasPreviousPage
-                                 }
-                                 nodes {
+                                 }}
+                                 nodes {{
                                      number
                                      title
                                      headRefName
-                                     mergeCommit {
+                                     mergeCommit {{
                                          ...inner_commit
-                                     }
-                                     last_commits: commits(last: 1) {
+                                     }}
+                                     last_commits: commits(last: 1) {{
                                          totalCount
-                                         nodes {
-                                             commit {
+                                         nodes {{
+                                             commit {{
                                                  ...inner_commit
-                                             }
-                                         }
-                                     }
+                                             }}
+                                         }}
+                                     }}
                                      merged
                                      viewerCanDeleteHeadRef
                                      html_url : permalink
-                                     user: author {
+                                     user: author {{
                                          login
-                                     }
-                                 }
-                             }
-                         }
-                     } \
-                     """
+                                     }}
+                                 }}
+                             }}
+                         }}
+                     }}"""
     repo_split = repo.split("/")
     variables = {
         "owner": repo_split[0],
@@ -546,16 +672,17 @@ def __delete_branch(pr: PullRequestGQL, force: bool = False) -> PullRequestGQL:
         logger.warning(f"Failed to delete remote branch for PR #{pr.number}", e)
     return pr
 
+
 def log_run(pr: PullRequestGQL) -> None:
     # pr_link = term.link(pr.html_url, f"{RESET}\t#{Y}{pr.number:<6}{RESET}")
     # pr_link = term.link(pr.html_url, f"{RESET}\t#{Y}{pr.number:<6}{RESET}")
     pr_link = f"{RESET}\t#{Y}{term.link(pr.html_url, f"{pr.number:<6}")}{RESET}"
 
     pr_log = f"{pr_link} {B}'{pr.title}'{RESET} " \
-    f"on branch {Y}{pr.headref_name}{RESET} " \
-    f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET} " \
-    f"from {Y}{pr.last_commits.nodes[0].commit.abbreviated_oid}{RESET} " \
-    f"on {Y}{pr.merge_commit.committed_date if pr.merge_commit else 'N/A'}{RESET}"
+             f"on branch {Y}{pr.headref_name}{RESET} " \
+             f"merged via commit {Y}{pr.merge_commit.abbreviated_oid if pr.merge_commit else 'N/A'}{RESET} " \
+             f"from {Y}{pr.last_commits.nodes[0].commit.abbreviated_oid}{RESET} " \
+             f"on {Y}{pr.merge_commit.committed_date if pr.merge_commit else 'N/A'}{RESET}"
     logger.info(pr_log)
 
 
@@ -579,10 +706,11 @@ def run_script(repo_name: str | None, path: str,
     if repo.archived:
         logger.warning(f"{R_BG}The repository {Y}{repo.full_name}{R_BG} is archived. Exiting.{RESET_BG}")
         sys.exit(0)
-    
+
     # fix for "store_true"
     default_answer = default_answer if default_answer is True else None
     clean_repo(gh, repo, min_age_days, dryrun, default_answer)
+
 
 def clean_repo(gh: Github,
                repo: Repository,
@@ -616,7 +744,7 @@ def clean_repo(gh: Github,
             all_prs.append(pr)
             # Required: merged, can delete ref, and merge commit
             try:
-                #if pr.can_delete_branch:
+                # if pr.can_delete_branch:
                 if __check_if_branch_pr_safe_to_delete(pr, min_age_days):
                     can_delete.append(pr)
             except Exception as e:
@@ -702,10 +830,18 @@ if __name__ == '__main__':
         level=logging.DEBUG if args.verbose >= 3 else logging.INFO,
         format="%(message)s",
     )
+    # install_cache(
+    #     backend="sqlite",
+    # )
     if not args.nocache:
         if VERBOSE:
             logger.debug("Enabling HTTP caching for GitHub API requests...")
         install_cache(
+            cache_control=True,
+        )
+    else:
+        install_cache(
+            backend="memory",
             cache_control=True,
         )
     run_script(args.repo, args.path, args.min_age_days, dryrun=args.dryrun, default_answer=args.yes)

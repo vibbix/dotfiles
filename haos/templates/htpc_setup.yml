@@ -1,0 +1,4 @@
+# HTPC setup
+- alias: "HTPC is on"
+  condition: template
+  value_template: "{{  template }}"
