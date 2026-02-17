@@ -30,7 +30,6 @@ then
   fi
   test -e '/usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh' && source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
   # Path to your oh-my-zsh installation.
-  #plugins=(macos web-search vscode) #gitfast zsh-autosuggestions)
   test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
   # pnpm
   export PNPM_HOME="$HOME/Library/pnpm"
@@ -151,19 +150,38 @@ export PATH="$PATH:$HOME/.rvm/bin"
 # load scripts
 export PATH="$PATH:$DOTFILESROOT/scripts/"
 
-if command -v docker &>/dev/null; then
-  plugins+=(docker)
-fi
-
-if command -v tmux &>/dev/null; then
-  plugins+=(tmux)
-fi
 
 #https://hamatti.org/posts/guide-vs-code-to-recognising-pep-723-dependencies/
 alias uvv='f() { uv python find --script "$1" | pbcopy};f'
 
+add_plugin_if_exists() {
+  if command -v "$1" &>/dev/null; then
+    plugins+=("$1")
+  fi
+}
+
+add_plugin_if_exists "kubectl"
+add_plugin_if_exists "helm"
+add_plugin_if_exists "minikube"
+add_plugin_if_exists "kind"
+add_plugin_if_exists "aws"
+add_plugin_if_exists "bun"
+add_plugin_if_exists "buf"
+add_plugin_if_exists "golang"
+add_plugin_if_exists "bazel"
+add_plugin_if_exists "docker"
+add_plugin_if_exists "tmux"
+
 #source oh-my-zsh after all plugins are setup
 source $ZSH/oh-my-zsh.sh
+
+if command -v colima &>/dev/null; then
+  source <(colima completion zsh)
+fi
+
+if command -v tilt &>/dev/null; then
+  source <(tilt completion zsh)
+fi
 
 # bun completions
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
@@ -177,8 +195,6 @@ if [[ -d  "/mnt/wsl" ]]; then
   alias op="op.exe"
 fi
 
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
 if [[ $machine == 'Mac' ]]
 then
   export PATH="/opt/homebrew/bin:$PATH"
