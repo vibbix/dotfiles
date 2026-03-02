@@ -22,10 +22,12 @@ dependencies = [
     "mdutils~=1.8.1",
     # For scraping
     "PyChromeDevTools~=1.0.4",
+    # for parsing bazel
+    "libcst~=1.8.6",
 ]
 
 [dependency-groups]
 dev = [
     "ipykernel>=7.1.0",
-    "jupyterlab>=4.5.1",
+    "jupyterlab>=4.5.2",
 ]

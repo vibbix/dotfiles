@@ -1,3 +1,15 @@
 .idea/
 .venv/
 github-schema.graphql
+*.ipynb
+./scripts/clean_all_dtmx.sh
+.gitignore
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+scripts/clean_all_corp.sh
