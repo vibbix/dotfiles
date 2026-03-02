@@ -6,15 +6,15 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pexpect>=4.9.0",
-    "rich>=14.0.0",
+    "rich>=14.3.3",
     "gitpython~=3.1.45",
     "PyGithub~=2.8.1",
-    "tqdm~=4.67.1",
-    "requests-cache~=1.2.1",
+    "tqdm~=4.67.3",
+    "requests-cache~=1.3.0",
     "colorlog~=6.10.1",
     "colorama~=0.4.6",
     "sourcetypes3~=0.1.0",
-    "blessed~=1.25.0",
+    "blessed~=1.32.0",
     # Markdown parsing libraries
     # "mistletoe~=1.5.1",
     "beautifulsoup4~=4.14.3",
