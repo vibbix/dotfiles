@@ -10,7 +10,7 @@ dependencies = [
     "gitpython~=3.1.45",
     "PyGithub~=2.8.1",
     "tqdm~=4.67.3",
-    "requests-cache~=1.3.0",
+    "requests-cache~=1.3.1",
     "colorlog~=6.10.1",
     "colorama~=0.4.6",
     "sourcetypes3~=0.1.0",
@@ -24,6 +24,8 @@ dependencies = [
     "PyChromeDevTools~=1.0.4",
     # for parsing bazel
     "libcst~=1.8.6",
+    # for message box
+    "pymsgbox~=2.0.1"
 ]
 
 [dependency-groups]

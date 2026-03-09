@@ -37,7 +37,7 @@ class SlackEvent:
     event_type: str
     event_text: str
 
-def __load_html_from_pasteboard() -> str:
+def load_html_from_pasteboard() -> str:
     if not PASTEBOARD_AVAILABLE:
         raise RuntimeError("pasteboard module is not available.")
     pb = pasteboard.Pasteboard()
@@ -94,8 +94,8 @@ def __create_chat_tuple(event: SlackEvent) -> tuple[str, str, str]:
         italics = "_"
     return event.avatar_url, event.username, italics + event.event_text + italics
 
-def __run_script(verbose: bool = False, paste: bool = False) -> None:
-    html_source: str = __load_html_from_pasteboard()
+def __run_script(paste: bool = False) -> None:
+    html_source: str = load_html_from_pasteboard()
     events : List[SlackEvent] = parse_html_from_slack(html_source)
     output = render_markdown_from_events(events)
     if paste and PASTEBOARD_AVAILABLE:
@@ -145,4 +145,4 @@ if __name__ == '__main__':
         level=logging.DEBUG if args.verbose >= 3 else logging.INFO,
         format="%(message)s",
     )
-    __run_script(verbose=args.verbose, paste=args.paste)
+    __run_script(paste=args.paste)
