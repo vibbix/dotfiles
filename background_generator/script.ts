@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 
-let scene, camera, renderer, container;
-const objects = [];
+let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, container: HTMLElement | null;
+const objects: THREE.Object3D[] = [];
 
 const addExtraShapes = false;
 
@@ -11,6 +11,7 @@ animate();
 
 function init() {
     container = document.getElementById('display-container');
+    if (!container) return;
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
@@ -49,6 +50,11 @@ function init() {
     const shapes = [createGearShape(), createPlayShape(), createPlusShape()];
 
     if (addExtraShapes) {
+        const glassMaterial = new THREE.MeshPhysicalMaterial({
+            ...glassMaterialProps,
+            attenuationColor: new THREE.Color(0xffffff)
+        });
+
         for (let i = 0; i < 12; i++) {
             const shape = shapes[Math.floor(Math.random() * shapes.length)];
             const extrudeSettings = { depth: 0.5, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.1 };
@@ -74,7 +80,7 @@ function init() {
         const paths = data.paths;
         const group = new THREE.Group(); // Put all parts in a group to manage them easily
 
-        paths.forEach((path) => {
+        paths.forEach((path: any) => {
             // Use SVGLoader's createShapes which handles holes properly
             const shapes = SVGLoader.createShapes(path);
 
@@ -125,13 +131,13 @@ function init() {
         // Progress callback
         undefined,
         // Error callback
-        (error) => {
+        (error: any) => {
             console.error('An error happened loading the SVG:', error);
         });
 }
 
 // Custom Shapes
-function createGearShape() {
+function createGearShape(): THREE.Shape {
     const s = new THREE.Shape();
     s.absarc(0, 0, 3, 0, Math.PI * 2, false);
     const hole = new THREE.Path();
@@ -140,13 +146,13 @@ function createGearShape() {
     return s;
 }
 
-function createPlayShape() {
+function createPlayShape(): THREE.Shape {
     const s = new THREE.Shape();
     s.moveTo(0, 0); s.lineTo(0, 6); s.lineTo(5, 3); s.lineTo(0, 0);
     return s;
 }
 
-function createPlusShape() {
+function createPlusShape(): THREE.Shape {
     const s = new THREE.Shape();
     s.moveTo(-1, 3); s.lineTo(1, 3); s.lineTo(1, 1); s.lineTo(3, 1);
     s.lineTo(3, -1); s.lineTo(1, -1); s.lineTo(1, -3); s.lineTo(-1, -3);
@@ -161,10 +167,13 @@ function animate() {
         obj.rotation.y += 0.005;
         obj.position.y += Math.sin(Date.now() * 0.001 + i) * 0.003;
     });
-    renderer.render(scene, camera);
+    if (scene && camera && renderer) {
+        renderer.render(scene, camera);
+    }
 }
 
 window.addEventListener('resize', () => {
+    if (!camera || !renderer || !container) return;
     camera.aspect = container.clientWidth / container.clientHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(container.clientWidth, container.clientHeight);

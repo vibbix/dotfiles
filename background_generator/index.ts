@@ -17,7 +17,7 @@ const server = Bun.serve({
       // Use Bun's bundler to automatically compile the script and resolve `three` 
       // module imports from node_modules into a single JS file
       const build = await Bun.build({
-        entrypoints: ['./script.js'],
+        entrypoints: ['./script.ts'],
       });
 
       if (!build.success) {
