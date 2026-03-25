@@ -1,0 +1,35 @@
+body { 
+  margin: 0; 
+  overflow: hidden; 
+  background: linear-gradient(135deg, #2e0249, #570a57, #a91079); 
+  height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+}
+
+/* The "Curved Display" Frame Effect */
+#display-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) perspective(1000px) rotateX(2deg);
+    width: 90vw;
+    height: 80vh;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 40px; /* Curved edges */
+    box-shadow: 0 0 50px rgba(0,0,0,0.2);
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(5px);
+}
+
+canvas { display: block; }
+
+.label {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    opacity: 0.6;
+    pointer-events: none;
+}
