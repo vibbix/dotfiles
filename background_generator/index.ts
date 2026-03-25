@@ -32,6 +32,10 @@ const server = Bun.serve({
       });
     }
 
+    if (url.pathname.startsWith("/logos/")) {
+      return new Response(Bun.file("." + url.pathname));
+    }
+
     return new Response("Not Found", { status: 404 });
   }
 });

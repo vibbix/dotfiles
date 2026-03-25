@@ -3,13 +3,18 @@ import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 
 let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, container: HTMLElement | null;
 const objects: THREE.Object3D[] = [];
+const svgLoader = new SVGLoader();
 
 const addExtraShapes = false;
 
-init();
-animate();
+init().then(() => {
+    animate();
+}).catch((error) => {
+    console.error('An error occurred during initialization:', error);
+});
+// animate();
 
-function init() {
+async function init() {
     container = document.getElementById('display-container');
     if (!container) return;
 
@@ -48,6 +53,11 @@ function init() {
 
     // Geometry Generation
     const shapes = [createGearShape(), createPlayShape(), createPlusShape()];
+    const glassMaterial = new THREE.MeshPhysicalMaterial({
+        ...glassMaterialProps,
+        attenuationColor: new THREE.Color(0xffffff)
+    });
+
 
     if (addExtraShapes) {
         const glassMaterial = new THREE.MeshPhysicalMaterial({
@@ -61,79 +71,89 @@ function init() {
             const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
 
             const mesh = new THREE.Mesh(geometry, glassMaterial);
-
-            mesh.position.set(
-                (Math.random() - 0.5) * 15,
-                (Math.random() - 0.5) * 10,
-                (Math.random() - 0.5) * 5
-            );
-            mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-            mesh.scale.set(0.4, 0.4, 0.4);
-
-            scene.add(mesh);
-            objects.push(mesh);
+            addToScene(mesh, 0.4);
         }
     }
+    
+    //create bazel
+    const bazel = createBazelLogo(glassMaterial);
+    addToScene(bazel, 0.4);
 
-    const loader = new SVGLoader();
-    loader.load('https://upload.wikimedia.org/wikipedia/commons/7/7d/Bazel_logo.svg', (data) => {
-        const paths = data.paths;
-        const group = new THREE.Group(); // Put all parts in a group to manage them easily
+    try {
+        const data = await svgLoader.loadAsync('./logos/backstage.svg');
+        const wrapper = createGroupFromSVGData(data, glassMaterialProps, 10, 2, 0.5, new THREE.Color('#7df3e1'));
+        addToScene(wrapper, 0.001);
+    } catch (error) {
+        console.error('An error happened loading the SVG:', error);
+    }
+}
 
-        paths.forEach((path: any) => {
-            // Use SVGLoader's createShapes which handles holes properly
-            const shapes = SVGLoader.createShapes(path);
+function addToScene(obj: THREE.Object3D, scale: number = 1.0) {
+    obj.position.set(
+        (Math.random() - 0.5) * 15,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 5
+    );
+    obj.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+    obj.scale.set(scale, scale, scale);
 
-            // Get color from the SVG path
-            const materialColor = path.color;
+    scene.add(obj);
+    objects.push(obj);
+}
 
-            // Create a glass material tinted with the SVG color
-            const pathGlassMaterial = new THREE.MeshPhysicalMaterial({
-                ...glassMaterialProps,
-                color: materialColor,
-                attenuationColor: materialColor
-            });
+function createGroupFromSVGData(data: any, baseMaterialProps: any, 
+    depth = 10, bezelThickness: number = 2, bezelSize: number = 0.5,
+    overrideColor?: THREE.Color): THREE.Group {
+    const paths = data.paths;
+    const group = new THREE.Group(); // Put all parts in a group to manage them easily
 
-            shapes.forEach((shape) => {
-                const geometry = new THREE.ExtrudeGeometry(shape, {
-                    depth: 2, // Thicker for better glass refraction
-                    bevelEnabled: true,
-                    bevelThickness: 0.5,
-                    bevelSize: 0.5
-                });
+    let zOffset = 0; // Added this to prevent Z-fighting!
 
-                const mesh = new THREE.Mesh(geometry, pathGlassMaterial);
-                group.add(mesh);
-            });
+    paths.forEach((path: any) => {
+        // Use SVGLoader's createShapes which handles holes properly
+        const shapes = SVGLoader.createShapes(path);
+
+        // Get color from the SVG path
+        const materialColor = overrideColor || path.color;
+
+        // Create a glass material tinted with the SVG color
+        const pathGlassMaterial = new THREE.MeshPhysicalMaterial({
+            ...baseMaterialProps,
+            color: materialColor,
+            attenuationColor: materialColor
         });
 
-        // Center the entire SVG after combining
-        const box = new THREE.Box3().setFromObject(group);
-        const center = new THREE.Vector3();
-        box.getCenter(center);
-        group.position.sub(center); // Offset the group to be centered around(0,0,0)
+        shapes.forEach((shape) => {
+            const geometry = new THREE.ExtrudeGeometry(shape, {
+                depth: depth, // Thicker for better glass refraction
+                bevelEnabled: true,
+                bevelThickness: bezelThickness,
+                bevelSize: bezelSize
+            });
 
-        // We use a wrapper group so we can apply rotation and scaling
-        // without messing up our center offset
-        const wrapper = new THREE.Group();
-        wrapper.add(group);
+            const mesh = new THREE.Mesh(geometry, pathGlassMaterial);
+            
+            // Slightly offset each shape on the Z-axis to prevent 
+            // perfectly overlapping meshes from Z-fighting (clipping/glitching)
+            mesh.position.z = zOffset;
+            zOffset += 0.2; // Tiny increment for the next layer
 
-        // 2. Scale it down! SVG pixels (100+) -> Three.js units (~1-5)
-        wrapper.scale.set(0.02, 0.02, 0.02);
-
-        // 3. Correct the orientation (SVGs are Y-down, Three.js is Y-up)
-        wrapper.rotation.x = Math.PI;
-        // To help fix visual errors between overlapping extrusions sharing exactly the same Z plan, slightly angle it or disable depthWrite for pure transparents.
-
-        scene.add(wrapper);
-        objects.push(wrapper); // Add to your animation array
-    },
-        // Progress callback
-        undefined,
-        // Error callback
-        (error: any) => {
-            console.error('An error happened loading the SVG:', error);
+            group.add(mesh);
         });
+    });
+
+    // Center the entire SVG after combining
+    const box = new THREE.Box3().setFromObject(group);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    group.position.sub(center); // Offset the group to be centered around(0,0,0)
+
+    // We use a wrapper group so we can apply rotation and scaling
+    // without messing up our center offset
+    const wrapper = new THREE.Group();
+    wrapper.add(group);
+
+    return wrapper;
 }
 
 // Custom Shapes
@@ -158,6 +178,34 @@ function createPlusShape(): THREE.Shape {
     s.lineTo(3, -1); s.lineTo(1, -1); s.lineTo(1, -3); s.lineTo(-1, -3);
     s.lineTo(-1, -1); s.lineTo(-3, -1); s.lineTo(-3, 1); s.lineTo(-1, 1);
     return s;
+}
+
+function createBazelLogo(material?: THREE.Material): THREE.Group {
+    const group = new THREE.Group();
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    
+    const mainMaterial = material ? material.clone() : new THREE.MeshStandardMaterial();
+    if ('color' in mainMaterial) (mainMaterial as any).color.set('#76D275');
+
+    const centerMaterial = material ? material.clone() : new THREE.MeshStandardMaterial();
+    if ('color' in centerMaterial) (centerMaterial as any).color.set('#43A047');
+    
+    // The Bazel logo consists of 3 cubes arranged to form a heart-like shape
+    // when viewed from an isometric perspective.
+    const leftCube = new THREE.Mesh(geometry, mainMaterial);
+    leftCube.position.set(-1, 0, 0);
+    
+    const rightCube = new THREE.Mesh(geometry, mainMaterial);
+    rightCube.position.set(0, 0, -1);
+    
+    const bottomCube = new THREE.Mesh(geometry, centerMaterial);
+    bottomCube.position.set(0, 0, 0);
+    
+    group.add(leftCube);
+    group.add(rightCube);
+    group.add(bottomCube);
+    
+    return group;
 }
 
 function animate() {
