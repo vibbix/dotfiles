@@ -10,6 +10,12 @@
     <div id="display-container">
         <div class="label">3D Glassmorphic SVG Environment</div>
     </div>
-    <script type="module" src="./script.js"></script>
+    <script type="module" src="./script.ts"></script>
+    
+    <!-- Simple Hot-Reload Script -->
+    <script>
+      const ws = new WebSocket(`ws://${location.host}/hot-reload`);
+      ws.onmessage = () => location.reload();
+    </script>
   </body>
 </html>

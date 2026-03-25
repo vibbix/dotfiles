@@ -41,14 +41,16 @@ async function init() {
 
     // Frosted Glass Material base components
     const glassMaterialProps = {
-        thickness: 0.8,
-        roughness: 0.1,
-        transmission: 1,
-        ior: 1.45,
-        attenuationDistance: 0.5,
+        thickness: 2.0,        // Increased thickness refracts more
+        roughness: 0.4,        // Higher roughness diffuses the background heavily (the "frosting")
+        transmission: 1.0,     // Keep high to let light through 
+        ior: 1.5,              // Slight indexing tweak (glass is ~1.5)
+        attenuationDistance: 1.0, // Light scatters faster through the volume
         transparent: true,
-        opacity: 0.9,
-        envMapIntensity: 1
+        opacity: 1.0,          // Can usually stay at 1 with physical transmission
+        envMapIntensity: 1.5,  // Boost reflections to help show the volume
+        clearcoat: 1.0,        // Adds a polished sheen on top of the rough frosting
+        clearcoatRoughness: 0.1 // Keeps the exterior sheen sharp while interior is frosted
     };
 
     // Geometry Generation
@@ -83,6 +85,10 @@ async function init() {
         const data = await svgLoader.loadAsync('./logos/backstage.svg');
         const wrapper = createGroupFromSVGData(data, glassMaterialProps, 10, 2, 0.5, new THREE.Color('#7df3e1'));
         addToScene(wrapper, 0.001);
+
+        const logo_2 = await svgLoader.loadAsync('./logos/logo.svg');
+        const wrapper_2 = createGroupFromSVGData(logo_2, glassMaterialProps, 10, 2, 0.5, new THREE.Color('#1C75F6'), true);
+        addToScene(wrapper_2, 0.05);
     } catch (error) {
         console.error('An error happened loading the SVG:', error);
     }
@@ -103,7 +109,7 @@ function addToScene(obj: THREE.Object3D, scale: number = 1.0) {
 
 function createGroupFromSVGData(data: any, baseMaterialProps: any, 
     depth = 10, bezelThickness: number = 2, bezelSize: number = 0.5,
-    overrideColor?: THREE.Color): THREE.Group {
+    overrideColor?: THREE.Color, applyGradient: boolean = false): THREE.Group {
     const paths = data.paths;
     const group = new THREE.Group(); // Put all parts in a group to manage them easily
 
@@ -122,6 +128,47 @@ function createGroupFromSVGData(data: any, baseMaterialProps: any,
             color: materialColor,
             attenuationColor: materialColor
         });
+
+        if (applyGradient) {
+            pathGlassMaterial.onBeforeCompile = (shader) => {
+                // Pass SVG coordinates from Vertex to Fragment Shader
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <common>',
+                    `#include <common>\nvarying vec2 vSVGCoords;`
+                ).replace(
+                    '#include <begin_vertex>',
+                    `#include <begin_vertex>\nvSVGCoords = position.xy;`
+                );
+
+                // Receive coordinates and compute gradient
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <common>',
+                    `#include <common>\nvarying vec2 vSVGCoords;`
+                ).replace(
+                    '#include <color_fragment>',
+                    `#include <color_fragment>
+                    
+                    // Replicate SVG transform: translate(15.2407 18.5482) scale(17.8858)
+                    vec2 center = vec2(15.2407, 18.5482);
+                    // SVGLoader sometimes parses Y as negative, so we use abs() to be safe
+                    vec2 coords = vec2(vSVGCoords.x, abs(vSVGCoords.y));
+                    float radius = 17.8858;
+                    
+                    float dist = distance(coords, center) / radius;
+                    
+                    // Hex converted to normalized rgb (0.0 to 1.0 ranges)
+                    vec3 colorInner = vec3(0.1098, 0.4588, 0.9647); // #1C75F6
+                    vec3 colorOuter = vec3(0.1020, 0.2902, 0.7804); // #1A4AC7
+                    
+                    // Apply stop offsets from defs
+                    float stopParam = smoothstep(0.558071, 1.0, dist);
+                    vec3 gradientColor = mix(colorInner, colorOuter, clamp(stopParam, 0.0, 1.0));
+                    
+                    diffuseColor.rgb = gradientColor;
+                    `
+                );
+            };
+        }
 
         shapes.forEach((shape) => {
             const geometry = new THREE.ExtrudeGeometry(shape, {
