@@ -1,0 +1,23 @@
+---
+{% if meeting.tags %}
+tags:
+  {% for tag in meeting.tags %}
+  - {{ tag }}
+  {% endfor %}
+{% endif %}
+{% if meeting.participants %}
+meeting_participants:
+  {% for participant in meeting.participants %}
+  - {{ participant }}
+  {% endfor %}
+{% endif %}
+---
+
+# Transcription
+
+{% if meeting.transcription %}
+{{ meeting.transcription }}
+{% else %}
+No transcription available.
+{% endif %}
+

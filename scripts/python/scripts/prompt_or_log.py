@@ -5,8 +5,16 @@ from typing import Optional
 import os
 import sys
 import logging
-
 LOG = logging.getLogger(__name__)
+
+GUI_AVAILABLE = False
+try:
+    import tkinter as tk
+    from tkinter import ttk, simpledialog, messagebox
+    GUI_AVAILABLE = True
+except ImportError as e:
+    LOG.error("tkinter not available; GUI mode will not be usable: %s", e)
+
 
 class Mode(Enum):
     """Operating mode for PromptOrLog.
@@ -75,44 +83,68 @@ class PromptOrLog:
             # If any issue checking isatty, fall back to LOG
             return Mode.LOG
 
-        return Mode.LOG
+        return Mode.GUI
 
     def prompt(self, message: str, default: Optional[str] = None) -> Optional[str]:
         """Prompt the user for input according to the effective mode.
 
-        - In LOG mode this prints the message and returns the default immediately.
-          (This method does not block for console input to keep behavior simple.)
+        - In LOG mode this prints the message and prompts for console input.
         - In GUI mode it attempts to open a simple tkinter dialog; if tkinter is not
           available or fails it falls back to LOG behavior.
 
-        Returns the entered string in GUI mode (or None if cancelled), otherwise the
-        provided default in LOG/fallback mode.
+        Returns the entered string (or None if cancelled in GUI mode, or empty string
+        is entered in console mode without a default).
         """
         mode = self.get_mode()
         if mode == Mode.LOG:
-            print(message)
-            return default
+            if default:
+                prompt_text = f"{message} [{default}]: "
+            else:
+                prompt_text = f"{message}: "
+            try:
+                user_input = input(prompt_text).strip()
+                # If user pressed enter without typing, return default
+                if not user_input and default:
+                    return default
+                # Return the user input (could be empty string)
+                return user_input if user_input else None
+            except (EOFError, KeyboardInterrupt):
+                # Handle Ctrl+D or Ctrl+C gracefully
+                print("\nCancelled by user")
+                return None
 
         if mode == Mode.GUI:
-            try:
-                import tkinter as tk
-                from tkinter import simpledialog
-            except Exception:
+            if not GUI_AVAILABLE:
                 # Fall back to console behavior if tkinter isn't available
-                print(message)
-                return default
+                return self.prompt(message, default)
 
             # Ensure `answer` is defined even if the dialog fails unexpectedly
             answer: Optional[str] = default
-            root = tk.Tk()
-            root.withdraw()
             try:
-                answer = simpledialog.askstring("Input", message, initialvalue=default)
-            finally:
+                root = tk.Tk()
+                root.withdraw()
                 try:
-                    root.destroy()
-                except Exception:
-                    pass
+                    answer = simpledialog.askstring("Input", message, initialvalue=default)
+                finally:
+                    try:
+                        root.destroy()
+                    except Exception:
+                        pass
+            except Exception as e:
+                LOG.exception("Failed to show GUI dialog, falling back to console: %s", e)
+                # Fall back to console input
+                if default:
+                    prompt_text = f"{message} [{default}]: "
+                else:
+                    prompt_text = f"{message}: "
+                try:
+                    user_input = input(prompt_text).strip()
+                    if not user_input and default:
+                        return default
+                    return user_input if user_input else None
+                except (EOFError, KeyboardInterrupt):
+                    print("\nCancelled by user")
+                    return None
             return answer
 
         # Shouldn't reach here, but keep a safe default
@@ -125,46 +157,89 @@ class PromptOrLog:
         Behavior:
         - In GUI mode, show a simple yes/no dialog using tkinter.messagebox.askyesno
           and return the user's choice.
-        - In LOG mode (or if GUI is unavailable) log the question and return the
-          provided `default` value immediately (non-blocking).
+        - In LOG mode (or if GUI is unavailable) prompt via console for y/n input.
 
         Args:
             question: The question to present to the user.
-            default: The boolean value to return in LOG mode or if GUI can't be used.
+            default: The boolean value to return as default if user just presses enter.
         """
         mode = self.get_mode()
         if mode == Mode.LOG:
-            LOG.info(question)
-            return default
+            default_indicator = "Y/n" if default else "y/N"
+            prompt_text = f"{question} [{default_indicator}]: "
+
+            try:
+                while True:
+                    user_input = input(prompt_text).strip().lower()
+                    # If empty input, use default
+                    if not user_input:
+                        return default
+                    # Check for yes/no responses
+                    if user_input in ('y', 'yes'):
+                        return True
+                    elif user_input in ('n', 'no'):
+                        return False
+                    else:
+                        print("Please enter 'y' or 'n' (or press Enter for default)")
+            except (EOFError, KeyboardInterrupt):
+                # Handle Ctrl+D or Ctrl+C gracefully
+                print("\nCancelled by user, using default")
+                return default
 
         if mode == Mode.GUI:
-            try:
-                import tkinter as tk
-                from tkinter import messagebox
-            except Exception:
-                LOG.exception("tkinter not available; falling back to LOG behavior")
-                LOG.info(question)
-                return default
+            if not GUI_AVAILABLE:
+                # Fall back to console behavior if tkinter isn't available
+                default_indicator = "Y/n" if default else "y/N"
+                prompt_text = f"{question} [{default_indicator}]: "
 
-            try:
-                root = tk.Tk()
-                root.withdraw()
-            except Exception:
-                # If creating a root window fails, fall back
-                LOG.exception("failed to initialize tkinter root; falling back to LOG")
-                LOG.info(question)
-                return default
+                try:
+                    while True:
+                        user_input = input(prompt_text).strip().lower()
+                        if not user_input:
+                            return default
+                        if user_input in ('y', 'yes'):
+                            return True
+                        elif user_input in ('n', 'no'):
+                            return False
+                        else:
+                            print("Please enter 'y' or 'n' (or press Enter for default)")
+                except (EOFError, KeyboardInterrupt):
+                    print("\nCancelled by user, using default")
+                    return default
 
             # Default result to `default` to ensure a value is always returned
             result: bool = bool(default)
             try:
-                # askyesno returns True for yes, False for no
-                result = messagebox.askyesno("Confirm", question)
-            finally:
+                root = tk.Tk()
+                root.withdraw()
                 try:
-                    root.destroy()
-                except Exception:
-                    pass
+                    # askyesno returns True for yes, False for no
+                    result = messagebox.askyesno("Confirm", question)
+                finally:
+                    try:
+                        root.destroy()
+                    except Exception:
+                        pass
+            except Exception as e:
+                LOG.exception("Failed to show GUI dialog, falling back to console: %s", e)
+                # Fall back to console input
+                default_indicator = "Y/n" if default else "y/N"
+                prompt_text = f"{question} [{default_indicator}]: "
+
+                try:
+                    while True:
+                        user_input = input(prompt_text).strip().lower()
+                        if not user_input:
+                            return default
+                        if user_input in ('y', 'yes'):
+                            return True
+                        elif user_input in ('n', 'no'):
+                            return False
+                        else:
+                            print("Please enter 'y' or 'n' (or press Enter for default)")
+                except (EOFError, KeyboardInterrupt):
+                    print("\nCancelled by user, using default")
+                    return default
 
             return bool(result)
 

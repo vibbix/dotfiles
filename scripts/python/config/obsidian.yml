@@ -1,0 +1,3 @@
+meeting_notes:
+  vault: "TempVault"
+  pattern: "08 - Meeting Notes/{{date:YYYY}}/{{date:YYYY-MM-DD}} {{date:dddd}}.md"
