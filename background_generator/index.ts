@@ -42,7 +42,7 @@ const server = Bun.serve({
       });
     }
 
-    if (url.pathname.startsWith("/logos/")) {
+    if (url.pathname.startsWith("/logos/") || url.pathname.startsWith("/models/")) {
       return new Response(Bun.file("." + url.pathname));
     }
 

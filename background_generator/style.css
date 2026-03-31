@@ -2,7 +2,9 @@ body {
     margin: 0; 
     overflow: hidden; 
     /* background: linear-gradient(135deg, #2e0249, #570a57, #a91079);  */
-    background: linear-gradient(135deg, #a8c0ff, #3f2b96); 
+    /* background: linear-gradient(135deg, #a8c0ff, #3f2b96);  */
+    background: linear-gradient(135deg, #FFFFFF, #a8c0ff); 
+
     height: 100vh;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
 }

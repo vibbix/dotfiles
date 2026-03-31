@@ -5,7 +5,7 @@ let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRe
 const objects: THREE.Object3D[] = [];
 const svgLoader = new SVGLoader();
 
-const addExtraShapes = false;
+const addExtraShapes = true;
 
 init().then(() => {
     animate();
@@ -41,7 +41,7 @@ async function init() {
 
     // Frosted Glass Material base components
     const glassMaterialProps = {
-        thickness: 2.0,        // Increased thickness refracts more
+        thickness: 1.0,        // Increased thickness refracts more
         roughness: 0.4,        // Higher roughness diffuses the background heavily (the "frosting")
         transmission: 1.0,     // Keep high to let light through 
         ior: 1.5,              // Slight indexing tweak (glass is ~1.5)
@@ -89,6 +89,10 @@ async function init() {
         const logo_2 = await svgLoader.loadAsync('./logos/logo.svg');
         const wrapper_2 = createGroupFromSVGData(logo_2, glassMaterialProps, 10, 2, 0.5, new THREE.Color('#1C75F6'), true);
         addToScene(wrapper_2, 0.05);
+
+        const logo_3 = await svgLoader.loadAsync('./logos/k8s.svg');
+        const wrapper_3 = createGroupFromSVGData(logo_3, glassMaterialProps, 10, 2, 0.5, undefined, false, 20);
+        addToScene(wrapper_3, 0.005);
     } catch (error) {
         console.error('An error happened loading the SVG:', error);
     }
@@ -109,7 +113,7 @@ function addToScene(obj: THREE.Object3D, scale: number = 1.0) {
 
 function createGroupFromSVGData(data: any, baseMaterialProps: any, 
     depth = 10, bezelThickness: number = 2, bezelSize: number = 0.5,
-    overrideColor?: THREE.Color, applyGradient: boolean = false): THREE.Group {
+    overrideColor?: THREE.Color, applyGradient: boolean = false, newZ: number = 0.05): THREE.Group {
     const paths = data.paths;
     const group = new THREE.Group(); // Put all parts in a group to manage them easily
 
@@ -183,7 +187,7 @@ function createGroupFromSVGData(data: any, baseMaterialProps: any,
             // Slightly offset each shape on the Z-axis to prevent 
             // perfectly overlapping meshes from Z-fighting (clipping/glitching)
             mesh.position.z = zOffset;
-            zOffset += 0.2; // Tiny increment for the next layer
+            zOffset += newZ; // Tiny increment for the next layer
 
             group.add(mesh);
         });
