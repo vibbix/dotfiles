@@ -9,7 +9,11 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+import sys
+
 import yaml
+from rich.console import Console
+from rich.tree import Tree
 
 log = logging.getLogger(__name__)
 
@@ -224,6 +228,33 @@ async def load_obsidian_bookmarks(
     return results
 
 
+def _build_tree(node: dict, tree: Tree) -> None:
+    btype = node.get("type", "")
+    title = node.get("title") or node.get("id", "<untitled>")
+
+    if btype == "folder":
+        branch = tree.add(f"[bold blue][DIR] {title}[/bold blue]")
+        for child in node.get("children") or []:
+            _build_tree(child, branch)
+    elif btype == "separator":
+        tree.add("[dim]---[/dim]")
+    else:
+        uri = node.get("uri", "")
+        label = f"[green]{title}[/green]"
+        if uri:
+            label += f"  [dim]{uri}[/dim]"
+        tree.add(label)
+
+
+def print_firefox_bookmarks_tree(raw: dict) -> None:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    console = Console(legacy_windows=False)
+    root = Tree("[bold]Firefox Bookmarks[/bold]")
+    for root_node in raw["bookmarks"].values():
+        _build_tree(root_node, root)
+    console.print(root)
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Sync Firefox bookmarks to Obsidian")
     parser.add_argument(
@@ -245,9 +276,11 @@ async def main() -> None:
         format="%(levelname)s %(message)s",
     )
 
+    raw: dict = json.loads(args.bookmarks_file.read_text(encoding="utf-8"))
+    print_firefox_bookmarks_tree(raw)
+
     bookmarks = await load_firefox_bookmarks(args.bookmarks_file)
     obsidian_bookmarks = await load_obsidian_bookmarks()
-    print(obsidian_bookmarks)
 
 
 if __name__ == "__main__":
