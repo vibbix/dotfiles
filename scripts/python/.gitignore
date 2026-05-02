@@ -13,3 +13,4 @@ __pycache__/
 # Environments
 .env
 scripts/clean_all_corp.sh
+bookmarks.json
