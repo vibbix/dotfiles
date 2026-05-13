@@ -5,7 +5,7 @@ let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRe
 const objects: THREE.Object3D[] = [];
 const svgLoader = new SVGLoader();
 
-const addExtraShapes = true;
+const addExtraShapes = false;
 
 init().then(() => {
     animate();
@@ -93,6 +93,11 @@ async function init() {
         const logo_3 = await svgLoader.loadAsync('./logos/k8s.svg');
         const wrapper_3 = createGroupFromSVGData(logo_3, glassMaterialProps, 10, 2, 0.5, undefined, false, 20);
         addToScene(wrapper_3, 0.005);
+
+
+        const logo_4 = await svgLoader.loadAsync('./logos/docker.svg');
+        const wrapper_4 = createGroupFromSVGData(logo_4, glassMaterialProps, 10, 2, 0.5, undefined, false);
+        addToScene(wrapper_4, 0.1);
     } catch (error) {
         console.error('An error happened loading the SVG:', error);
     }

@@ -22,3 +22,77 @@ new skill dir automatically. Once linked, `install-doc-builder` can be run as
 Each skill carries a SemVer `version:` in its `SKILL.md` frontmatter, and **any
 change to a skill must bump that `version:`** (patch = doc/template tweaks, minor =
 new behavior, major = breaking install changes).
+
+## How to use my jira-cli fork
+
+My fork lives at [vibbix/jira-cli](https://github.com/vibbix/jira-cli) and adds two features on top of upstream:
+
+- `JIRA_FORCE_INTERACTIVE=1` — forces the interactive TUI even when stdout is piped
+- `--select-on-enter` — pressing Enter in the TUI quits and prints the selected issue as JSON instead of opening a browser
+
+### 1. Clone and build the fork
+
+```bash
+git clone git@github.com:vibbix/jira-cli.git ~/git/vibbix/jira-cli
+cd ~/git/vibbix/jira-cli
+go build -o ~/.local/bin/jira ./cmd/jira
+```
+
+Make sure `~/.local/bin` (or wherever you install the binary) is on your `$PATH`.
+
+### 2. Add upstream PRs as git worktrees
+
+Two upstream PRs are tracked as local branches. From inside the repo:
+
+```bash
+git remote add upstream https://github.com/ankitpokhrel/jira-cli.git
+git fetch upstream pull/909/head:pr-909 pull/877/head:pr-877
+
+# PR #909 – API Level Field Support (implements --json output flag)
+git worktree add ../jira-cli-pr-909 pr-909
+
+# PR #877 – Refactor: remove calls to internal from pkg directory
+git worktree add ../jira-cli-pr-877 pr-877
+```
+
+Each worktree lands in a sibling directory (`../jira-cli-pr-909`, `../jira-cli-pr-877`) so you can review, cherry-pick, or rebase them independently without disturbing the main checkout.
+
+### 3. Fork-specific features
+
+#### `JIRA_FORCE_INTERACTIVE=1`
+
+By default, `jira-cli` detects whether stdout is a TTY. When you capture its output with `$(...)`, stdout is a pipe, so the tool falls back to plain-text mode. Setting this env var bypasses that check and forces the full interactive TUI to launch (tcell opens `/dev/tty` directly, so it renders to your terminal regardless of how stdout is wired).
+
+```bash
+JIRA_FORCE_INTERACTIVE=1 jira issue list   # shows TUI even inside $()
+```
+
+#### `--select-on-enter`
+
+Changes what the Enter key does in the issue list TUI. Normally Enter opens the selected issue in your browser. With this flag, Enter instead:
+
+1. Stops the TUI cleanly
+2. Prints a single-element JSON array to stdout:
+
+```json
+[
+  {
+    "key": "PROJ-123",
+    "summary": "Fix the thing",
+    "type": "Bug",
+    "status": "In Progress",
+    "assignee": "Jane Doe",
+    "reporter": "John Doe",
+    "priority": "High"
+  }
+]
+```
+
+Combined with `JIRA_FORCE_INTERACTIVE=1`, this lets a script show the interactive picker and capture the chosen ticket:
+
+```bash
+SELECTED=$(JIRA_FORCE_INTERACTIVE=1 jira issue list -q "$JQL" --select-on-enter)
+KEY=$(jq -r '.[0].key' <<< "$SELECTED")
+```
+
+The `create-branch-from-latest-issue` script in `scripts/` uses exactly this pattern to let you pick an open Jira ticket and automatically create a git branch named after it.
