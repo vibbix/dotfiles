@@ -89,6 +89,7 @@ async function init() {
         const logo_2 = await svgLoader.loadAsync('./logos/logo.svg');
         const wrapper_2 = createGroupFromSVGData(logo_2, glassMaterialProps, 10, 2, 0.5, new THREE.Color('#1C75F6'), true);
         addToScene(wrapper_2, 0.05);
+        
 
         const logo_3 = await svgLoader.loadAsync('./logos/k8s.svg');
         const wrapper_3 = createGroupFromSVGData(logo_3, glassMaterialProps, 10, 2, 0.5, undefined, false, 20);
@@ -98,6 +99,10 @@ async function init() {
         const logo_4 = await svgLoader.loadAsync('./logos/docker.svg');
         const wrapper_4 = createGroupFromSVGData(logo_4, glassMaterialProps, 10, 2, 0.5, undefined, false);
         addToScene(wrapper_4, 0.1);
+
+        const logo_5 = await svgLoader.loadAsync('./logos/logo-ai-shield.svg');
+        const wrapper_5 = createGroupFromSVGData(logo_5, glassMaterialProps, 10, 2, 0.5, new THREE.Color(220, 25, 56), true);
+        addToScene(wrapper_5, 0.1);
     } catch (error) {
         console.error('An error happened loading the SVG:', error);
     }
