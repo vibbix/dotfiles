@@ -37,7 +37,7 @@
             "internalConsoleOptions": "neverOpen",
             "request": "launch",
             "name": "Run website",
-            "program": "start",
+            "program": "index.html",
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false,
             "watchMode": false

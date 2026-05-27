@@ -1,6 +1,5 @@
 {
   "name": "background_generator",
-  "module": "index.ts",
   "type": "module",
   "private": true,
   "devDependencies": {
@@ -14,6 +13,8 @@
     "three": "^0.183.2"
   },
   "scripts": {
-    "start": "bun run index.ts"
+    "dev": "bun ./index.html",
+    "build": "bun build ./index.html --outdir=dist --minify",
+    "start": "bun ./index.html"
   }
 }

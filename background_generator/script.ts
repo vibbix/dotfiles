@@ -1,7 +1,15 @@
 import * as THREE from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 
-let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, container: HTMLElement | null;
+// Importing the SVGs lets Bun's HTML bundler copy + content-hash them and
+// rewrite these to the final asset URLs. SVGLoader fetches them at runtime.
+import backstageUrl from './logos/backstage.svg';
+import logoUrl from './logos/logo.svg';
+import k8sUrl from './logos/k8s.svg';
+import dockerUrl from './logos/docker.svg';
+import aiShieldUrl from './logos/logo-ai-shield.svg';
+
+let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.Renderer, container: HTMLElement | null;
 const objects: THREE.Object3D[] = [];
 const svgLoader = new SVGLoader();
 
@@ -82,27 +90,27 @@ async function init() {
     addToScene(bazel, 0.4);
 
     try {
-        const data = await svgLoader.loadAsync('./logos/backstage.svg');
+        const data = await svgLoader.loadAsync(backstageUrl);
         const wrapper = createGroupFromSVGData(data, glassMaterialProps, 10, 2, 0.5, new THREE.Color('#7df3e1'));
         addToScene(wrapper, 0.001);
 
-        const logo_2 = await svgLoader.loadAsync('./logos/logo.svg');
+        const logo_2 = await svgLoader.loadAsync(logoUrl);
         const wrapper_2 = createGroupFromSVGData(logo_2, glassMaterialProps, 10, 2, 0.5, new THREE.Color('#1C75F6'), true);
         addToScene(wrapper_2, 0.05);
-        
 
-        const logo_3 = await svgLoader.loadAsync('./logos/k8s.svg');
+
+        const logo_3 = await svgLoader.loadAsync(k8sUrl);
         const wrapper_3 = createGroupFromSVGData(logo_3, glassMaterialProps, 10, 2, 0.5, undefined, false, 20);
         addToScene(wrapper_3, 0.005);
 
 
-        const logo_4 = await svgLoader.loadAsync('./logos/docker.svg');
+        const logo_4 = await svgLoader.loadAsync(dockerUrl);
         const wrapper_4 = createGroupFromSVGData(logo_4, glassMaterialProps, 10, 2, 0.5, undefined, false);
         addToScene(wrapper_4, 0.1);
 
-        const logo_5 = await svgLoader.loadAsync('./logos/logo-ai-shield.svg');
-        const wrapper_5 = createGroupFromSVGData(logo_5, glassMaterialProps, 10, 2, 0.5, new THREE.Color(220, 25, 56), true);
-        addToScene(wrapper_5, 0.1);
+        const logo_5 = await svgLoader.loadAsync(aiShieldUrl);
+        const wrapper_5 = createGroupFromSVGData(logo_5, glassMaterialProps, 10, 2, 0.5, new THREE.Color('#DC1938'), false);
+        addToScene(wrapper_5, 0.05);
     } catch (error) {
         console.error('An error happened loading the SVG:', error);
     }
