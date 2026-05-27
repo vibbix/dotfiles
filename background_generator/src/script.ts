@@ -122,7 +122,7 @@ async function init() {
 
         const aiShield = await svgLoader.loadAsync(aiShieldUrl);
         SvgLogoBuilder.from(aiShield, glassMaterialProps)
-            .color('#DC1938')
+            .angularGradient() // ported from logo-ai.svg's conic red sweep
             .addToScene(scene, objects, 0.05);
     } catch (error) {
         console.error('An error happened loading the SVG:', error);
