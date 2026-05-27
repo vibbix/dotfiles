@@ -1,5 +1,7 @@
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
+import { positionGeometry, vec2, distance, smoothstep, mix, color, clamp, abs } from 'three/tsl';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // Importing the SVGs lets Bun's HTML bundler copy + content-hash them and
 // rewrite these to the final asset URLs. SVGLoader fetches them at runtime.
@@ -16,11 +18,10 @@ const svgLoader = new SVGLoader();
 const addExtraShapes = false;
 
 init().then(() => {
-    animate();
+    renderer.setAnimationLoop(animate);
 }).catch((error) => {
     console.error('An error occurred during initialization:', error);
 });
-// animate();
 
 async function init() {
     container = document.getElementById('display-container');
@@ -30,10 +31,18 @@ async function init() {
     camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.z = 12;
 
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer = new THREE.WebGPURenderer({ antialias: true, alpha: true });
+    await renderer.init(); // WebGPU device/adapter setup is async
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(renderer.domElement);
+
+    // Transmissive glass shows the environment via reflection/refraction.
+    // Without an environment map, WebGPU renders these surfaces black, so we
+    // bake a neutral studio environment (PMREM) for the glass to sample.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
 
     // Enhanced Lighting for Purple Environment
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -51,26 +60,26 @@ async function init() {
     const glassMaterialProps = {
         thickness: 1.0,        // Increased thickness refracts more
         roughness: 0.4,        // Higher roughness diffuses the background heavily (the "frosting")
-        transmission: 1.0,     // Keep high to let light through 
+        transmission: 0.6,     // <1 so the albedo / colorNode (logo color & gradient) still shows
         ior: 1.5,              // Slight indexing tweak (glass is ~1.5)
-        attenuationDistance: 1.0, // Light scatters faster through the volume
+        attenuationDistance: 0.4, // Shorter distance => stronger tint from attenuationColor
         transparent: true,
         opacity: 1.0,          // Can usually stay at 1 with physical transmission
-        envMapIntensity: 1.5,  // Boost reflections to help show the volume
+        envMapIntensity: 1.0,  // Lower so reflections don't wash out the tint (was very mirror-like)
         clearcoat: 1.0,        // Adds a polished sheen on top of the rough frosting
         clearcoatRoughness: 0.1 // Keeps the exterior sheen sharp while interior is frosted
     };
 
     // Geometry Generation
     const shapes = [createGearShape(), createPlayShape(), createPlusShape()];
-    const glassMaterial = new THREE.MeshPhysicalMaterial({
+    const glassMaterial = new THREE.MeshPhysicalNodeMaterial({
         ...glassMaterialProps,
         attenuationColor: new THREE.Color(0xffffff)
     });
 
 
     if (addExtraShapes) {
-        const glassMaterial = new THREE.MeshPhysicalMaterial({
+        const glassMaterial = new THREE.MeshPhysicalNodeMaterial({
             ...glassMaterialProps,
             attenuationColor: new THREE.Color(0xffffff)
         });
@@ -145,51 +154,22 @@ function createGroupFromSVGData(data: any, baseMaterialProps: any,
         const materialColor = overrideColor || path.color;
 
         // Create a glass material tinted with the SVG color
-        const pathGlassMaterial = new THREE.MeshPhysicalMaterial({
+        const pathGlassMaterial = new THREE.MeshPhysicalNodeMaterial({
             ...baseMaterialProps,
             color: materialColor,
             attenuationColor: materialColor
         });
 
         if (applyGradient) {
-            pathGlassMaterial.onBeforeCompile = (shader) => {
-                // Pass SVG coordinates from Vertex to Fragment Shader
-                shader.vertexShader = shader.vertexShader.replace(
-                    '#include <common>',
-                    `#include <common>\nvarying vec2 vSVGCoords;`
-                ).replace(
-                    '#include <begin_vertex>',
-                    `#include <begin_vertex>\nvSVGCoords = position.xy;`
-                );
-
-                // Receive coordinates and compute gradient
-                shader.fragmentShader = shader.fragmentShader.replace(
-                    '#include <common>',
-                    `#include <common>\nvarying vec2 vSVGCoords;`
-                ).replace(
-                    '#include <color_fragment>',
-                    `#include <color_fragment>
-                    
-                    // Replicate SVG transform: translate(15.2407 18.5482) scale(17.8858)
-                    vec2 center = vec2(15.2407, 18.5482);
-                    // SVGLoader sometimes parses Y as negative, so we use abs() to be safe
-                    vec2 coords = vec2(vSVGCoords.x, abs(vSVGCoords.y));
-                    float radius = 17.8858;
-                    
-                    float dist = distance(coords, center) / radius;
-                    
-                    // Hex converted to normalized rgb (0.0 to 1.0 ranges)
-                    vec3 colorInner = vec3(0.1098, 0.4588, 0.9647); // #1C75F6
-                    vec3 colorOuter = vec3(0.1020, 0.2902, 0.7804); // #1A4AC7
-                    
-                    // Apply stop offsets from defs
-                    float stopParam = smoothstep(0.558071, 1.0, dist);
-                    vec3 gradientColor = mix(colorInner, colorOuter, clamp(stopParam, 0.0, 1.0));
-                    
-                    diffuseColor.rgb = gradientColor;
-                    `
-                );
-            };
+            // TSL port of the radial-gradient fragment shader. The geometry's
+            // local XY are the SVG coordinates; we blend two blues by distance
+            // from the gradient center, replicating the SVG's radial stops.
+            // (SVGLoader can flip Y, so abs() the Y to stay safe.)
+            const center = vec2(15.2407, 18.5482);
+            const coords = vec2(positionGeometry.x, abs(positionGeometry.y));
+            const dist = distance(coords, center).div(17.8858);
+            const stopParam = clamp(smoothstep(0.558071, 1.0, dist), 0.0, 1.0);
+            pathGlassMaterial.colorNode = mix(color(0x1c75f6), color(0x1a4ac7), stopParam);
         }
 
         shapes.forEach((shape) => {
@@ -278,7 +258,6 @@ function createBazelLogo(material?: THREE.Material): THREE.Group {
 }
 
 function animate() {
-    requestAnimationFrame(animate);
     objects.forEach((obj, i) => {
         obj.rotation.x += 0.005;
         obj.rotation.y += 0.005;
