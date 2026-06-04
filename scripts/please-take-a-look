@@ -23,6 +23,7 @@ requires acli "https://developer.atlassian.com/cloud/acli/getting-started/instal
 requires gh   "https://cli.github.com/"
 requires jq
 requires perl
+requires uvx  "https://docs.astral.sh/uv/"
 
 if [ -z "${JIRA_PREFIX:-}" ]; then
   echo "Error: JIRA_PREFIX environment variable is not set" >&2
@@ -65,13 +66,43 @@ PR_URL=$(jq -r '.url' <<< "$PR_JSON")
 
 REPO_NWO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
-OUTPUT=$(printf 'PTAL [%s](%s/%s) - %s - PR %s#[%s](%s)' \
+# Canonical markdown form -- source of truth for the rich-text conversion
+# below and the format emitted to non-TTY stdout.
+MD_OUTPUT=$(printf 'PTAL [%s](%s/%s) - `%s` - PR %s#[%s](%s)' \
   "$TICKET_ID" "$JIRA_PREFIX" "$TICKET_ID" "$TICKET_NAME" \
   "$REPO_NWO" "$PR_NUMBER" "$PR_URL")
 
-printf '%s\n' "$OUTPUT"
+# OSC 8 hyperlink: ESC]8;;URL ESC\ TEXT ESC]8;; ESC\
+# Renders as a clickable link in iTerm2, VS Code, recent Terminal.app, etc.
+osc8() {
+  printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$1" "$2"
+}
 
-if command -v pbcopy >/dev/null 2>&1; then
-  printf '%s' "$OUTPUT" | pbcopy
-  echo "(copied to clipboard)" >&2
+if [ -t 1 ]; then
+  TICKET_LINK=$(osc8 "$JIRA_PREFIX/$TICKET_ID" "$TICKET_ID")
+  PR_LINK=$(osc8 "$PR_URL" "$PR_NUMBER")
+  printf 'PTAL %s - %s - PR %s#%s\n' \
+    "$TICKET_LINK" "$TICKET_NAME" "$REPO_NWO" "$PR_LINK"
+else
+  printf '%s\n' "$MD_OUTPUT"
+fi
+
+# Markdown -> HTML (uvx markdown_py) -> RTF (textutil), then place RTF AND
+# plain-text flavors on the macOS pasteboard via osascript. Slack/Mail/Notes
+# paste as rich text; apps that only read plain text get the markdown.
+if command -v osascript >/dev/null 2>&1; then
+  TMP_RTF=$(mktemp -t ptal_rtf)
+  TMP_TXT=$(mktemp -t ptal_txt)
+  trap 'rm -f "$TMP_RTF" "$TMP_TXT"' EXIT
+  printf '%s' "$MD_OUTPUT" > "$TMP_TXT"
+  printf '%s' "$MD_OUTPUT" \
+    | uvx --quiet --from markdown markdown_py \
+    | textutil -stdin -format html -convert rtf -stdout \
+    > "$TMP_RTF"
+  osascript >/dev/null <<EOF
+set rtfData to (read (POSIX file "$TMP_RTF") as «class RTF »)
+set txtData to (read (POSIX file "$TMP_TXT") as «class utf8»)
+set the clipboard to {«class RTF »:rtfData, string:txtData}
+EOF
+  echo "(copied to clipboard as rich text + plain)" >&2
 fi
