@@ -68,7 +68,7 @@ REPO_NWO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
 # Canonical markdown form -- source of truth for the rich-text conversion
 # below and the format emitted to non-TTY stdout.
-MD_OUTPUT=$(printf 'PTAL [%s](%s/%s) - `%s` - PR %s#[%s](%s)' \
+MD_OUTPUT=$(printf 'PTAL [%s](%s/%s) - \`%s\` - PR [%s#%s](%s)' \
   "$TICKET_ID" "$JIRA_PREFIX" "$TICKET_ID" "$TICKET_NAME" \
   "$REPO_NWO" "$PR_NUMBER" "$PR_URL")
 
@@ -81,7 +81,7 @@ osc8() {
 if [ -t 1 ]; then
   TICKET_LINK=$(osc8 "$JIRA_PREFIX/$TICKET_ID" "$TICKET_ID")
   PR_LINK=$(osc8 "$PR_URL" "$PR_NUMBER")
-  printf 'PTAL %s - %s - PR %s#%s\n' \
+  printf 'PTAL %s - `%s`\n - PR %s#%s\n' \
     "$TICKET_LINK" "$TICKET_NAME" "$REPO_NWO" "$PR_LINK"
 else
   printf '%s\n' "$MD_OUTPUT"
