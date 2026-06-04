@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# please-take-a-look (alias: ptal)
+#
+# Generates a "PTAL" message for the current branch by combining the Jira
+# ticket (via acli) with the GitHub PR (via gh). Prints to stdout and, on
+# macOS, copies to the clipboard via pbcopy.
+#
+# Requirements:
+#   - acli (Atlassian CLI)
+#   - gh   (GitHub CLI)
+#   - JIRA_PREFIX env var, e.g. https://example.atlassian.net/browse
+#
+# Branch -> ticket extraction uses the PCRE:
+#   ((?<!([A-Z]{1,10})-?)[A-Z]+-\d+)
+# so e.g. `feature/ENG-123-foo` -> ENG-123.
+
+set -euo pipefail
+
+source "$(dirname "$0")/common.sh"
+
+requires git
+requires acli "https://developer.atlassian.com/cloud/acli/getting-started/install-the-atlassian-cli/"
+requires gh   "https://cli.github.com/"
+requires jq
+requires perl
+
+if [ -z "${JIRA_PREFIX:-}" ]; then
+  echo "Error: JIRA_PREFIX environment variable is not set" >&2
+  echo "  e.g. export JIRA_PREFIX=https://example.atlassian.net/browse" >&2
+  exit 1
+fi
+
+JIRA_PREFIX="${JIRA_PREFIX%/}"
+
+CURRENT_BRANCH=$(git branch --show-current)
+if [ -z "$CURRENT_BRANCH" ]; then
+  echo "Error: could not determine current branch (detached HEAD?)" >&2
+  exit 1
+fi
+
+TICKET_ID=$(perl -e '
+  no warnings "experimental::vlb";
+  my $b = $ARGV[0];
+  if ($b =~ /((?<!([A-Z]{1,10})-?)[A-Z]+-\d+)/) { print $1 }
+' "$CURRENT_BRANCH")
+
+if [ -z "$TICKET_ID" ]; then
+  echo "Error: no Jira ticket ID found in branch name: $CURRENT_BRANCH" >&2
+  exit 1
+fi
+
+TICKET_JSON=$(acli jira workitem view "$TICKET_ID" --fields summary --json)
+TICKET_NAME=$(jq -r '.fields.summary // empty' <<< "$TICKET_JSON")
+if [ -z "$TICKET_NAME" ]; then
+  echo "Error: could not fetch ticket summary for $TICKET_ID" >&2
+  exit 1
+fi
+
+if ! PR_JSON=$(gh pr view --json number,url 2>/dev/null); then
+  echo "Error: no GitHub PR found for branch $CURRENT_BRANCH" >&2
+  exit 1
+fi
+PR_NUMBER=$(jq -r '.number' <<< "$PR_JSON")
+PR_URL=$(jq -r '.url' <<< "$PR_JSON")
+
+REPO_NWO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+
+OUTPUT=$(printf 'PTAL [%s](%s/%s) - %s - PR %s#[%s](%s)' \
+  "$TICKET_ID" "$JIRA_PREFIX" "$TICKET_ID" "$TICKET_NAME" \
+  "$REPO_NWO" "$PR_NUMBER" "$PR_URL")
+
+printf '%s\n' "$OUTPUT"
+
+if command -v pbcopy >/dev/null 2>&1; then
+  printf '%s' "$OUTPUT" | pbcopy
+  echo "(copied to clipboard)" >&2
+fi

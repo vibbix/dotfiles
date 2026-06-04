@@ -6,3 +6,4 @@ zsh/\.zsh-update
 *.sqlite
 *.db
 node_modules/
+**/dist/**
