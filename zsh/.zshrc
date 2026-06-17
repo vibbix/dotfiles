@@ -13,7 +13,7 @@ if [[ $machine == 'Mac' ]]
 then
   source ${DOTFILESROOT}/zsh/macconf.sh
   export ZSH="/Users/$(whoami)/.oh-my-zsh"
-  export ANDROID_HOME="/Users/vibbix/Library/Android/sdk"
+  [ -d "$HOME/Library/Android/sdk" ] && export ANDROID_HOME="$HOME/Library/Android/sdk"
   #ZSH_THEME="powerlevel10k/powerlevel10k"
   # g cloud
   # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
@@ -43,7 +43,7 @@ then
   export DYLD_FALLBACK_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
   # pnpm end
 else
-  export ANDROID_HOME="$HOME/.android_home"
+  [ -d "$HOME/.android_home" ] && export ANDROID_HOME="$HOME/.android_home"
   export ZSH="/home/$(whoami)/.oh-my-zsh"
   plugins=(gitfast vscode)
   ZSH_THEME="dieter"
@@ -56,7 +56,10 @@ function toiletfonts(){
 }
 
 #source $HOME/.cargo/env
-export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$HOME/git/depot_tools:$HOME/flutter/bin:/usr/local/sbin:$HOME/flutter/bin:$PATH
+export PATH=$GOPATH/bin:$HOME/bin:/usr/local/bin:$PATH
+[ -v $ANDROID_HOME ] && export PATH=$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH
+export PATH=$HOME/git/depot_tools:$HOME/flutter/bin:/usr/local/sbin:$HOME/flutter/bin:$PATH
+
 [[ -s "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] && source "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 
 # fh - repeat history
