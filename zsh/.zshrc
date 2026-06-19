@@ -214,3 +214,7 @@ fi
 
 alias git_clean_gone="git fetch -p && git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -d"
 alias ptal="please-take-a-look"
+
+if [[ -d "$HOME/.terragrunt/bin" ]]; then
+  export PATH="$HOME/.terragrunt/bin:$PATH"
+fi
