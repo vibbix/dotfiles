@@ -2,14 +2,13 @@
   "permissions": {
     "deny": [
       "Write(**/00-index.md)",
-      "Edit(**/00-index.md)",
-      "MultiEdit(**/00-index.md)"
+      "Edit(**/00-index.md)"
     ]
   },
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
