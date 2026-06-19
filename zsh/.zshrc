@@ -184,7 +184,13 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # if WSL, use widnows' 1pass
 if [[ -d  "/mnt/wsl" ]]; then
   alias op="op.exe"
+  alias obsidian="obsidian.com"
 fi
+
+if [[ -f "$HOME/.local/bin/env" ]]; then
+  . "$HOME/.local/bin/env"
+fi
+export PATH="$HOME/.local/bin:$PATH"
 
 if [[ $machine == 'Mac' ]]
 then
