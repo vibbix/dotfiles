@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+# Treat known binary/asset types as binary (never touch their bytes).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.lock binary
