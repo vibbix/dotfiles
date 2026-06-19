@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(**/00-index.md)",
+      "Edit(**/00-index.md)",
+      "MultiEdit(**/00-index.md)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/block-index-write.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/run-doc-index.sh --hook"
+          }
+        ]
+      }
+    ]
+  }
+}

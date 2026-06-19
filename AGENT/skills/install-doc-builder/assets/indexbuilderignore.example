@@ -1,0 +1,8 @@
+# .indexbuilderignore — gitignore syntax. Paths matched here are excluded from
+# the generated index, in addition to git submodules and .gitignore patterns
+# (which are skipped automatically). Place at the docs root.
+
+# Examples:
+# drafts/
+# **/SCRATCH.md
+# vendor/**

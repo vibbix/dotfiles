@@ -61,12 +61,11 @@ class DocEntry:
     created: date | None
 
     @property
-    def sort_key(self) -> tuple[int, str, str]:
-        """Dated entries sort first (ascending by date), undated last. Ties — same
-        date, or both undated — break by filename."""
+    def sort_key(self) -> tuple[int, str]:
+        """Entries with a ``created`` date sort first (ascending), rest by name."""
         if self.created is None:
-            return (1, "", self.path.name)
-        return (0, self.created.isoformat(), self.path.name)
+            return (1, self.path.name)
+        return (0, self.created.isoformat())
 
 
 def _coerce_date(value: object) -> date | None:

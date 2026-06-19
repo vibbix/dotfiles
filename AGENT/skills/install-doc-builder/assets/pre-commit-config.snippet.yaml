@@ -1,0 +1,11 @@
+# Merge this `repos:` entry into the target repo's .pre-commit-config.yaml.
+# It fails the commit when the doc index is stale; run
+# `.claude/hooks/run-doc-index.sh` to regenerate, then re-stage and re-commit.
+- repo: local
+  hooks:
+    - id: doc-index
+      name: Rebuild markdown doc index
+      entry: .claude/hooks/run-doc-index.sh --check
+      language: system
+      files: \.md$
+      pass_filenames: false

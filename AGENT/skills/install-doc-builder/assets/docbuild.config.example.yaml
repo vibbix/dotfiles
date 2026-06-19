@@ -1,0 +1,8 @@
+# .docbuild.config.yaml — per-repo defaults for the doc-index builder.
+# Place at the repo root. CLI arguments to update_doc_index.py override these.
+
+# Directory scanned for markdown docs, relative to this file.
+root: docs
+
+# Optional explicit index path (default: <root>/00-index.md).
+# index: docs/00-index.md

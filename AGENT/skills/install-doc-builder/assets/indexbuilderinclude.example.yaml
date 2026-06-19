@@ -1,0 +1,10 @@
+# .indexbuilderinclude.yaml — manual entries for docs that cannot carry
+# frontmatter (vendored, generated, or otherwise read-only). Each entry is
+# indexed as a row; an entry overrides an auto-discovered doc at the same path.
+# `path` is required (relative to this file); the rest mirror the frontmatter.
+files:
+  - path: vendor/third-party/README.md
+    title: Third-party library overview
+    summary: How the bundled vendor library is structured.
+    read_if: You need to touch anything under vendor/.
+    created: 2026-06-19
