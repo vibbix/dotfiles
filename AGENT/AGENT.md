@@ -1,6 +1,8 @@
-# DOTFILES
+# Vibbix's AGENT file
  - `vibbix/dotfile` contains my dotfiles, used for preferences across a multitude of applications and processes
 # Preferences
+## Inline comments
+Keep comments sparse. Match the surrounding code's density; explain non-obvious *why*, not *what*. Do not narrate steps or restate the code.
 ## Python Projects
 ### Prefer `uv` over `python`
 Always prefer to use `uv`/`uvx` over `python`/`pipx`.
@@ -80,13 +82,12 @@ createRoot(document.getElementById("root")!).render(<App />);
 ```
 
 and a empty `./src/styles.css`,
-# Additional comments
-Keep comments sparse. Match the surrounding code's density; explain non-obvious *why*, not *what*. Do not narrate steps or restate the code.
+
 ## Git
 ### Branch names
 The preferred naming scheme for branches is `[feature|bugfix]/[JIRA-TICKET]-[feature-name-kebab-case]-[optional-version-number]`
 i.e. `feature/SI-13197-get-okta-working-v3`
-## Github
+## Github / Software Forges
 ### Creating PR's
 Have a short description, 2-3 sentences to describe the change. Under that, have a `What's changed` section, with single bullets per feature/change, consisting of around 3 to 5 words (max 7).
 
