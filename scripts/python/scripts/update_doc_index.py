@@ -19,9 +19,9 @@ Vendored files that cannot carry frontmatter can be listed in a
 criteria inline. Included entries override auto-discovered ones at the same path.
 
 Git submodules and anything matched by the repo's ``.gitignore`` are skipped by
-default. The scan root (and index path) may be set per-repo in a
-``.docbuild.config.{json,yaml,yml}`` (keys ``root`` and ``index``); CLI arguments
-override it.
+default. The scan root defaults to ``docs/claude`` under the git root; override it
+per-repo in a ``.docbuild.config.{json,yaml,yml}`` (keys ``root`` and ``index``) or
+via CLI arguments, which win.
 """
 import argparse
 import json
@@ -42,6 +42,7 @@ from mdutils.tools.Table import Table
 logger = logging.getLogger(__name__)
 
 INDEX_NAME = "00-index.md"
+DEFAULT_ROOT = "docs/claude"
 IGNORE_NAME = ".indexbuilderignore"
 INCLUDE_BASENAME = ".indexbuilderinclude"
 INCLUDE_KEYS = ("files", "include", "includes")
@@ -294,7 +295,7 @@ def main() -> int:
     parser.add_argument(
         "root", type=Path, nargs="?", default=None,
         help="Directory of markdown documents to scan "
-             f"(default: {CONFIG_BASENAME}.* 'root', else cwd)",
+             f"(default: {CONFIG_BASENAME}.* 'root', else <git-root>/{DEFAULT_ROOT})",
     )
     parser.add_argument(
         "--index", type=Path, default=None,
@@ -325,7 +326,10 @@ def main() -> int:
             if args.index is None and config.get("index"):
                 config_index = (base / str(config["index"])).resolve()
 
-    root: Path = (args.root or Path.cwd()).resolve()
+    if args.root is None:
+        base = find_git_root(Path.cwd()) or Path.cwd()
+        args.root = base / DEFAULT_ROOT
+    root: Path = args.root.resolve()
     if not root.is_dir():
         logger.error("Root is not a directory: %s", root)
         return 2

@@ -23,16 +23,18 @@ Read the skill instructions at
 (its templates are in that skill's assets/ and references/ folders) and follow the
 install procedure exactly, applying it to THIS repo (the current working directory).
 
-Specifics for this run:
+Keep the install minimal — don't drop files the repo doesn't need:
 - Vendor a copy of update_doc_index.py into .claude/scripts/ so the repo is
   self-contained; the resolver also falls back to ~/git/dotfiles and the public
   raw URL (github.com/vibbix/dotfiles).
-- Install both hooks: the Claude PostToolUse + PreToolUse hooks (via
-  .claude/settings.json) and the pre-commit-framework local hook.
-- Add the 00-index.md deny rule to .claude/settings.json.
-- Create .docbuild.config.yaml. Ask me which folder is the docs root if it's not
-  obvious (default: docs/).
-- Seed .indexbuilderignore / .indexbuilderinclude.yaml at the docs root.
+- Install .claude/hooks/run-doc-index.sh and wire the Claude PostToolUse hook plus
+  the pre-commit-framework local hook.
+- Lock 00-index.md with the native permissions.deny rule in .claude/settings.json.
+  Do NOT add a PreToolUse guard script — native deny only.
+- Docs root defaults to docs/claude. Only create .docbuild.config.yaml if the docs
+  live elsewhere; if it's docs/claude, create no config. Ask me if it's ambiguous.
+- Do NOT create empty .indexbuilderignore / .indexbuilderinclude.yaml — add them only
+  if there's real content. The agent-file note explains how to add them later.
 - Append the doc-index guide block to this repo's agent file (CLAUDE.md, or the
   existing AGENT.md/AGENTS.md), using the doc-index:guide markers idempotently.
 - Generate the index once and verify `.claude/hooks/run-doc-index.sh --check`

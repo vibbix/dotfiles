@@ -1,3 +1,0 @@
-# Per-repo defaults for the doc-index builder.
-# Docs root scanned for markdown; index written to <root>/00-index.md.
-root: docs/claude

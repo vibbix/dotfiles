@@ -27,8 +27,9 @@ You do not need to repeat either of these in `.indexbuilderignore`.
 
 ## `.indexbuilderignore`
 
-Gitignore syntax, placed at the docs root. Use it for *additional* exclusions
-beyond git's (e.g. drafts, scratch files):
+Optional. Gitignore syntax, placed at the docs root. Use it for *additional*
+exclusions beyond git's (e.g. drafts, scratch files). Don't create an empty one —
+add the file only when you have patterns to list:
 
 ```
 drafts/
@@ -37,10 +38,11 @@ drafts/
 
 ## `.indexbuilderinclude.{json,yaml,yml}`
 
-For docs that **cannot carry frontmatter** — vendored, generated, or read-only
-files. List them under `files:` (also accepts `include:` / `includes:`). Each
-entry needs a `path` (relative to the include file); the other keys mirror the
-frontmatter. An include entry overrides an auto-discovered doc at the same path.
+Optional. For docs that **cannot carry frontmatter** — vendored, generated, or
+read-only files. Create it only when there's something to register. List entries
+under `files:` (also accepts `include:` / `includes:`). Each entry needs a `path`
+(relative to the include file); the other keys mirror the frontmatter. An include
+entry overrides an auto-discovered doc at the same path.
 
 ```yaml
 files:
@@ -56,13 +58,14 @@ file itself.
 
 ## `.docbuild.config.{json,yaml,yml}`
 
-Per-repo defaults, discovered by walking up from the working directory to the git
-root. Recognized keys:
+Optional, and only needed when the docs root isn't the default `docs/claude`.
+Discovered by walking up from the working directory to the git root. Recognized keys:
 
 - `root` — directory to scan (relative to the config file).
 - `index` — explicit index path (default `<root>/00-index.md`).
 
-CLI arguments (`root` positional, `--index`) always override the config.
+CLI arguments (`root` positional, `--index`) always override the config; with no
+config and no CLI args the scan root is `<git-root>/docs/claude`.
 
 ```yaml
 root: docs

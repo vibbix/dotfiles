@@ -19,8 +19,13 @@ generated from the docs' frontmatter and kept current automatically:
 
 - a **PostToolUse** hook rebuilds the index whenever Claude writes a `.md` file;
 - a **pre-commit** hook rebuilds/verifies it at commit time;
-- `00-index.md` is **locked** (deny rule + PreToolUse guard) so only the script writes it;
-- a `.docbuild.config.yaml` sets the docs root per repo.
+- `00-index.md` is **locked** via native `permissions.deny` so only the script writes it.
+
+Keep the install minimal — only create files the repo actually needs:
+- the docs root defaults to **`docs/claude`**; only write `.docbuild.config.yaml` when
+  the root differs;
+- `.indexbuilderignore` / `.indexbuilderinclude.yaml` are optional — only create them
+  when they'd have real content (don't drop empty templates).
 
 The skill's templates live in `assets/` (relative to this file). Read
 [references/usage.md](references/usage.md) for the ignore/include/config formats.
@@ -46,28 +51,27 @@ Run these from the target repo. `$SKILL` = this skill's directory.
    (`vibbix/dotfiles` is public), but vendoring still keeps the repo self-contained
    and offline-capable, so prefer it.
 
-3. **Install the hook scripts.**
+3. **Install the hook script.**
    ```bash
-   cp "$SKILL/assets/run-doc-index.sh"   "$repo/.claude/hooks/"
-   cp "$SKILL/assets/block-index-write.sh" "$repo/.claude/hooks/"
-   chmod +x "$repo/.claude/hooks/"*.sh
+   cp "$SKILL/assets/run-doc-index.sh" "$repo/.claude/hooks/"
+   chmod +x "$repo/.claude/hooks/run-doc-index.sh"
    ```
 
 4. **Merge `assets/settings.snippet.json` into `$repo/.claude/settings.json`.**
    Create the file if absent. If it exists, merge: append the `permissions.deny`
-   entries and the `hooks.PreToolUse` / `hooks.PostToolUse` matchers (don't clobber
-   existing keys). The snippet adds the 00-index deny rules and both hooks.
+   entries and the `hooks.PostToolUse` matcher (don't clobber existing keys). The deny
+   rules are the *only* thing locking `00-index.md` — native settings, no guard script.
 
-5. **Create `.docbuild.config.yaml`** at the repo root from
-   `assets/docbuild.config.example.yaml`. Set `root` to the repo's docs directory
-   (default `docs`; ask the user if it's ambiguous).
+5. **Docs root / config — only if non-default.** The script defaults to `docs/claude`
+   under the git root. If the repo's docs live elsewhere, create `.docbuild.config.yaml`
+   from `assets/docbuild.config.example.yaml` and set `root`. If the docs root *is*
+   `docs/claude`, **do not** create a config file. Ask the user if the root is ambiguous.
 
-6. **Seed the ignore/include files** at the docs root if missing:
-   ```bash
-   cp -n "$SKILL/assets/indexbuilderignore.example"        "<docs-root>/.indexbuilderignore"
-   cp -n "$SKILL/assets/indexbuilderinclude.example.yaml"  "<docs-root>/.indexbuilderinclude.yaml"
-   ```
-   These are optional — submodules and `.gitignore` are excluded without them.
+6. **Ignore/include — only if non-empty.** Don't drop empty templates. Create
+   `<docs-root>/.indexbuilderignore` only when you have actual exclusion patterns, and
+   `<docs-root>/.indexbuilderinclude.yaml` only when there's a vendored doc to register
+   (see `assets/*.example*` for the formats). Submodules and `.gitignore` are excluded
+   without either file. The agent-file note (step 8) tells future sessions how to add them.
 
 7. **Wire up pre-commit.** Merge `assets/pre-commit-config.snippet.yaml` into
    `$repo/.pre-commit-config.yaml` (create with a top-level `repos:` list if absent).
@@ -102,5 +106,5 @@ Full reference: [references/usage.md](references/usage.md). In short:
 ## Rules
 
 - **Never** hand-edit any `00-index.md`. It is regenerated; edits are blocked by the
-  deny rule and PreToolUse guard. Change the source `.md` frontmatter or the include
-  file, then let the script rebuild it.
+  `permissions.deny` rule. Change the source `.md` frontmatter or the include file,
+  then let the script rebuild it.

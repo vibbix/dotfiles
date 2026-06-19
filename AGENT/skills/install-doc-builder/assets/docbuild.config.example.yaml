@@ -1,4 +1,5 @@
-# .docbuild.config.yaml — per-repo defaults for the doc-index builder.
+# .docbuild.config.yaml — per-repo override for the doc-index builder.
+# ONLY needed when the docs root is not the default `docs/claude`.
 # Place at the repo root. CLI arguments to update_doc_index.py override these.
 
 # Directory scanned for markdown docs, relative to this file.
