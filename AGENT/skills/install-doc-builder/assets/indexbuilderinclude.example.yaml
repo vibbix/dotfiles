@@ -1,4 +1,4 @@
-# .indexbuilderinclude.yaml — manual entries for docs that cannot carry
+# .indexbuilderinclude.yaml: manual entries for docs that cannot carry
 # frontmatter (vendored, generated, or otherwise read-only). Each entry is
 # indexed as a row; an entry overrides an auto-discovered doc at the same path.
 # `path` is required (relative to this file); the rest mirror the frontmatter.

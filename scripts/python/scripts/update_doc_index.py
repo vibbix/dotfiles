@@ -63,8 +63,8 @@ class DocEntry:
 
     @property
     def sort_key(self) -> tuple[int, str, str]:
-        """Dated entries sort first (ascending by date), undated last. Ties — same
-        date, or both undated — break by filename."""
+        """Dated entries sort first (ascending by date), undated last. Ties (same
+        date, or both undated) break by filename."""
         if self.created is None:
             return (1, "", self.path.name)
         return (0, self.created.isoformat(), self.path.name)
