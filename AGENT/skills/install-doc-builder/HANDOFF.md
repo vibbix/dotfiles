@@ -1,9 +1,19 @@
 # Handoff: install the doc-index builder in another repo
 
-This skill lives inside the dotfiles repo, so it isn't globally registered. To run
-it in a different repository, open a Claude Code session in that repo and paste the
-prompt below. It points Claude at this skill's `SKILL.md` by path and tells it to
-execute the install procedure against the current working directory.
+**If the skill is symlinked into `~/.claude/skills/`** (run `bash AGENT/skills/install.sh`
+from the dotfiles checkout — see the dotfiles README), just open a session in the target
+repo and run **`/install-doc-builder`** (or "use the install-doc-builder skill"). The
+path-based prompt below is the fallback for machines without that symlink.
+
+**Re-running is a safe update.** Invoking the skill again in an already-set-up repo
+refreshes the vendored script, hook, and guide block, de-dupes the settings and
+pre-commit merges, and reports the `installed -> current` version delta — it won't
+duplicate anything.
+
+This skill lives inside the dotfiles repo, so it isn't globally registered unless
+symlinked. To run it without the symlink, open a Claude Code session in the target repo
+and paste the prompt below. It points Claude at this skill's `SKILL.md` by path and tells
+it to execute the install procedure against the current working directory.
 
 ## Prerequisites
 

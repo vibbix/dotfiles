@@ -1,4 +1,4 @@
-<!-- doc-index:guide:start -->
+<!-- doc-index:guide:start v=0.1.0 -->
 ## Documentation index (`00-index.md`)
 
 This repo keeps an auto-generated index of its docs. **Never hand-edit any
