@@ -18,23 +18,17 @@ For example:
 # ]
 # ///
 # PYTHON CODE HERE
-```### Prefer `uv` over `python`
-Always prefer to use `uv`/`uvx` over `python`/`pipx`.
-When asked to write new scripts, unless told otherwise, use [PEP 723 - Intline script metadata](https://peps.python.org/pep-0723/).
-
-For example:
-```python
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#   "pexpect<=4.9.0",
-# ]
-# ///
-# PYTHON CODE HERE
 ```
+### Recommended Libraries
+These are my "usual" libaries, that I tend to use in every project of mine
+ - [tqdm](https://pypi.org/project/tqdm/) - used as a "wrapper" for python iterators to give live feed
+ - [sourcetypes3](https://pypi.org/project/sourcetypes3/) - Used for syntax highlighting of inline languages in python
+ - [requests](https://pypi.org/project/requests/) and [requests-cache](https://pypi.org/project/requests-cache/) - For making HTTP calls, and caching them locally
+ - [pillow](https://pypi.org/project/Pillow/) - image manipulation
+ - [beautifulsoup](https://www.crummy.com/software/BeautifulSoup/) - used for parsing HTML (in the future, maybe i should explore [scrapy](https://www.scrapy.org/))
 ## Javascript/Typescript Projects
 ### Conventions
+#### Date types
 - Use Temporal types (`Temporal.Instant`, `Temporal.ZonedDateTime`, `Temporal.Duration`) in schemas and domain types; convert to ISO strings only at the wire boundary
 ### Greenfield projects
 New "web", or web-adjacent project will use the `bun` runtime.
