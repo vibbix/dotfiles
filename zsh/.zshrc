@@ -211,8 +211,17 @@ if [[ -d "$HOME/.nvm" ]]; then
   fi
 fi
 
-
-alias git_clean_gone="git fetch -p && git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -d"
+# Cleans branches that are gone on remote
+git-clean-gone-local() {
+  git fetch -p && git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -d
+}
+# Cleans branches that are gone on remote
+git-clean-gone() {
+  git fetch -p && git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -D
+  git remote prune origin
+}
+alias gcg="git-clean-gone-local"
+alias gcga="git-clean-gone"
 alias ptal="please-take-a-look"
 
 if [[ -d "$HOME/.terragrunt/bin" ]]; then
