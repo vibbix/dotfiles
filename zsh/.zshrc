@@ -218,3 +218,5 @@ alias ptal="please-take-a-look"
 if [[ -d "$HOME/.terragrunt/bin" ]]; then
   export PATH="$HOME/.terragrunt/bin:$PATH"
 fi
+
+alias aws-login="uvx aws-sso-util@4.33.0 login --all"
