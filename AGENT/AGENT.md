@@ -1,6 +1,11 @@
 # Vibbix's AGENT file
  - `vibbix/dotfile` contains my dotfiles, used for preferences across a multitude of applications and processes
 # Preferences
+## Shell
+I tend to always use `zsh` for my shell, so take extra care when writing shell commands to make sure they're compatible.
+i.e. particularly for dealing with word splits.
+### Language Servers (LSP)
+Always prefer using an LSP for code navigation and edits when one is available for the language at hand. If no LSP is available, warn me before falling back to text-based search/edits.
 ## Inline comments
 Keep comments sparse. Match the surrounding code's density; explain non-obvious *why*, not *what*. Do not narrate steps or restate the code.
 ## Python Projects
