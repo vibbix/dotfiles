@@ -224,6 +224,11 @@ alias gcg="git-clean-gone-local"
 alias gcga="git-clean-gone"
 alias ptal="please-take-a-look"
 
+alias gic="git-clone.sh"
+
+# git-clone.sh (on PATH) clones + prints dest; wrapper cds into it
+gic() { local d; d=$(git-clone.sh "$@") && cd "$d"; }
+
 if [[ -d "$HOME/.terragrunt/bin" ]]; then
   export PATH="$HOME/.terragrunt/bin:$PATH"
 fi
