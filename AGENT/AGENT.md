@@ -7,7 +7,12 @@ i.e. particularly for dealing with word splits.
 ### Language Servers (LSP)
 Always prefer using an LSP for code navigation and edits when one is available for the language at hand. If no LSP is available, warn me before falling back to text-based search/edits.
 ## Inline comments
-Keep comments sparse. Match the surrounding code's density; explain non-obvious *why*, not *what*. Do not narrate steps or restate the code.
+Save history for the git commits (or wiki pages); comments should be for explaining quirky behavior - not for explaining how something came to be.
+Assume all code is self-documenting, and only write comments when necessary. Clean-up as you go if you see comments in the area
+where you are working that do not fit this new objective. You are allowed to explain non-obvious *why*, not *what*.
+Do not narrate steps or restate the code. A fast and loose rule is that most file "headers" are only 4 lines of text, roughly a paragrapy, and that at most, most source files are 5-10% comments.
+Anything above that is seen as an LLM smell.
+
 ## Python Projects
 ### Prefer `uv` over `python`
 Always prefer to use `uv`/`uvx` over `python`/`pipx`.
