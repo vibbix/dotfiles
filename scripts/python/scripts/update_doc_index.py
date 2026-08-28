@@ -33,6 +33,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 from urllib.parse import quote
+import operator
 
 import frontmatter
 import gitignore_parser
@@ -262,6 +263,8 @@ def _doc_link(entry: DocEntry, index_dir: Path) -> str:
     href = quote(Path(os.path.relpath(entry.path, index_dir)).as_posix())
     return f"[{_cell(entry.title)}]({href})"
 
+def _sort_tuples(tuples, key):
+    return sorted(tuples, key=operator.itemgetter(key))
 
 def render_table(entries: list[DocEntry], index_dir: Path) -> str:
     cells = list(COLUMNS)

@@ -1,7 +1,6 @@
 {
   "permissions": {
     "deny": [
-      "Write(**/00-index.md)",
       "Edit(**/00-index.md)"
     ]
   },

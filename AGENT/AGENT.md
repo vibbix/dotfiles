@@ -13,6 +13,9 @@ where you are working that do not fit this new objective. You are allowed to exp
 Do not narrate steps or restate the code. A fast and loose rule is that most file "headers" are only 4 lines of text, roughly a paragrapy, and that at most, most source files are 5-10% comments.
 Anything above that is seen as an LLM smell.
 
+## Leftover comments
+When you delete code, make the effort to delete useless, left over comments. Stuff like "$x used to be here" is less than useless, and pollutes the file.
+
 ## Python Projects
 ### Prefer `uv` over `python`
 Always prefer to use `uv`/`uvx` over `python`/`pipx`.
@@ -28,6 +31,47 @@ For example:
 # ]
 # ///
 # PYTHON CODE HERE
+```
+### Style Guide
+#### Inline Comments
+There are virtually ZERO use cases in which we should have a inlined import statement thats not at the header of a python source file.
+It's a MASSIVE LLM smell, and what it communicates to me is "I failed to read the file, and am patching individual sections of this code
+with literally zero thought about the composition of the project or if the fix I am doing is even relevant within the context of this source
+file or this project." This also applies to things like constant values, which should also be there.
+
+the ONLY exception is for cases with "optional libraries", like if we have a "darwin" or "windows" specific piece of code we need to load.
+#### Main Methods
+When writing CLI's also prefer to have the `main` method ONLY perform the minimum required validation / arg parsing before handing off to another method
+
+```python
+#CORRECT WAY
+def do_method(check: bool):
+  print(f"value: {check}")
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--check", action="store_true")
+    args = ap.parse_args()
+    check_args(check)
+    do_method(args.check)
+```
+#### Docstrings
+IF YOU ADD `docstrings` to a method, ALWAYS add the full definition:
+```python
+#CORRECT
+def multiply(a, b):
+    """
+    Multiply two numbers.
+
+    Args:
+        a (int): First number.
+        b (int): Second number.
+
+    Returns:
+        int: Product of a and b.
+    """
+    return a * b
+print(multiply(3, 5))
 ```
 ### Recommended Libraries
 These are my "usual" libaries, that I tend to use in every project of mine
