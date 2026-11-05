@@ -212,12 +212,15 @@ if [[ -d "$HOME/.nvm" ]]; then
 fi
 
 # Cleans branches that are gone on remote
+git-gone-branches() {
+  git for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads | awk '$2 == "[gone]" {print $1}'
+}
 git-clean-gone-local() {
-  git fetch -p && git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -d
+  git fetch -p && git-gone-branches | xargs git branch -d
 }
 # Cleans branches that are gone on remote
 git-clean-gone() {
-  git fetch -p && git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -D
+  git fetch -p && git-gone-branches | xargs git branch -D
   git remote prune origin
 }
 alias gcg="git-clean-gone-local"
@@ -236,3 +239,7 @@ fi
 
 alias aws-login="uvx aws-sso-util@4.33.0 login --all"
 export ENABLE_LSP_TOOL=1
+
+if [[ -f "$HOME/.config/vite-plus/env" ]]; then
+  . "/Users/vibbix/.config/vite-plus/env"
+fi
