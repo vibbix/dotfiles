@@ -135,8 +135,12 @@ and a empty `./src/styles.css`,
 ### Branch names
 The preferred naming scheme for branches is `[feature|bugfix]/[JIRA-TICKET]-[feature-name-kebab-case]-[optional-version-number]`
 i.e. `feature/SI-13197-get-okta-working-v3`
+Create branches with `git switch -c {branch} --no-track origin/main`: a branch tracking `origin/main` makes a plain `git push` fail.
 ## Github / Software Forges
 ### Creating PR's
 Have a short description, 2-3 sentences to describe the change. Under that, have a `What's changed` section, with single bullets per feature/change, consisting of around 3 to 5 words (max 7).
 
 For headline description, YOU MUST use the "[humanizer](https://github.com/blader/humanizer)" skill thats installed on the PR text, to reduce verbosity. 
+
+#### External PR's
+When helping make external PR's - make sure to not include our internal ticket number in it.
