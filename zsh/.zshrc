@@ -243,3 +243,9 @@ export ENABLE_LSP_TOOL=1
 if [[ -f "$HOME/.config/vite-plus/env" ]]; then
   . "/Users/vibbix/.config/vite-plus/env"
 fi
+
+#depot_tools
+
+if [[ -d "$HOME/git/chromium/depot_tools" ]]; then
+  export PATH="$HOME/git/chromium/depot_tools:$PATH"
+fi
